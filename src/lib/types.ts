@@ -5,18 +5,18 @@ export interface Question {
   content: string;
   answer: string;
   tags: string[];
-  createdAt: Date;
-  updatedAt: Date;
+  created_at: string;
+  updated_at: string;
   votes: number;
-  author: string;
+  author_id: string;
 }
 
 export interface Comment {
   id: string;
-  questionId: string;
+  question_id: string;
   content: string;
-  createdAt: Date;
-  author: string;
+  created_at: string;
+  author_id: string;
 }
 
 export interface Tag {

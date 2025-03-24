@@ -7,34 +7,36 @@ import { Question, Comment } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface QuestionDetailProps {
   question: Question;
   comments: Comment[];
+  onAddComment: (content: string) => Promise<void>;
+  onVote: (type: 'up' | 'down') => Promise<void>;
 }
 
-const QuestionDetail = ({ question, comments }: QuestionDetailProps) => {
+const QuestionDetail = ({ question, comments, onAddComment, onVote }: QuestionDetailProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editedAnswer, setEditedAnswer] = useState(question.answer);
   const [newComment, setNewComment] = useState('');
-  const [localComments, setLocalComments] = useState<Comment[]>(comments);
   const [voted, setVoted] = useState<'up' | 'down' | null>(null);
+  const { user } = useAuth();
   
-  const formatDate = (date: Date) => {
+  const formatDate = (dateString: string) => {
     return new Intl.DateTimeFormat('en-US', {
       month: 'long',
       day: 'numeric',
       year: 'numeric'
-    }).format(new Date(date));
+    }).format(new Date(dateString));
   };
 
-  const handleVote = (type: 'up' | 'down') => {
+  const handleVote = async (type: 'up' | 'down') => {
     if (voted === type) {
       setVoted(null);
-      toast.success("Vote removed");
     } else {
       setVoted(type);
-      toast.success(type === 'up' ? "Upvoted successfully" : "Downvoted successfully");
+      await onVote(type);
     }
   };
 
@@ -49,20 +51,16 @@ const QuestionDetail = ({ question, comments }: QuestionDetailProps) => {
     toast.success('Answer updated successfully');
   };
 
-  const handleAddComment = () => {
+  const handleAddComment = async () => {
     if (!newComment.trim()) return;
     
-    const comment: Comment = {
-      id: `temp-${Date.now()}`,
-      questionId: question.id,
-      content: newComment,
-      createdAt: new Date(),
-      author: 'You', // In a real app, this would be the logged-in user
-    };
+    if (!user) {
+      toast.error('You must be logged in to comment');
+      return;
+    }
     
-    setLocalComments([...localComments, comment]);
+    await onAddComment(newComment);
     setNewComment('');
-    toast.success('Comment added');
   };
 
   const containerVariants = {
@@ -91,7 +89,7 @@ const QuestionDetail = ({ question, comments }: QuestionDetailProps) => {
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">{question.title}</h1>
         
         <div className="mt-4 flex items-center text-sm text-gray-500 dark:text-gray-400">
-          <span>Posted by {question.author} on {formatDate(question.createdAt)}</span>
+          <span>Posted on {formatDate(question.created_at)}</span>
         </div>
         
         <div className="mt-6 prose dark:prose-invert max-w-none">
@@ -136,6 +134,7 @@ const QuestionDetail = ({ question, comments }: QuestionDetailProps) => {
                   ? 'bg-gray-100 text-green-600 dark:bg-gray-800 dark:text-green-400' 
                   : 'hover:bg-gray-100 dark:hover:bg-gray-800'
               }`}
+              disabled={!user}
             >
               <ThumbsUp className="h-5 w-5" />
               <span>{voted === 'up' ? question.votes + 1 : question.votes}</span>
@@ -147,19 +146,22 @@ const QuestionDetail = ({ question, comments }: QuestionDetailProps) => {
                   ? 'bg-gray-100 text-red-600 dark:bg-gray-800 dark:text-red-400' 
                   : 'hover:bg-gray-100 dark:hover:bg-gray-800'
               }`}
+              disabled={!user}
             >
               <ThumbsDown className="h-5 w-5" />
             </button>
           </div>
           
           <div className="flex items-center space-x-2">
-            <button 
-              onClick={() => setIsEditing(true)}
-              className="flex items-center space-x-1 p-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800"
-            >
-              <Edit className="h-5 w-5" />
-              <span className="hidden sm:inline">Edit</span>
-            </button>
+            {user && (
+              <button 
+                onClick={() => setIsEditing(true)}
+                className="flex items-center space-x-1 p-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800"
+              >
+                <Edit className="h-5 w-5" />
+                <span className="hidden sm:inline">Edit</span>
+              </button>
+            )}
             <button 
               onClick={handleShare}
               className="flex items-center space-x-1 p-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800"
@@ -177,12 +179,12 @@ const QuestionDetail = ({ question, comments }: QuestionDetailProps) => {
 
       <motion.div variants={itemVariants} className="glass-card p-8 rounded-xl">
         <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
-          Comments ({localComments.length})
+          Comments ({comments.length})
         </h2>
         
         <div className="mt-6 space-y-6">
           <AnimatePresence>
-            {localComments.map((comment) => (
+            {comments.map((comment) => (
               <motion.div 
                 key={comment.id}
                 initial={{ opacity: 0, y: 10 }}
@@ -193,10 +195,10 @@ const QuestionDetail = ({ question, comments }: QuestionDetailProps) => {
                 <div className="flex-1">
                   <div className="flex items-center justify-between">
                     <h3 className="text-sm font-medium text-gray-900 dark:text-white">
-                      {comment.author}
+                      {comment.author_id.substring(0, 8)}
                     </h3>
                     <time className="text-xs text-gray-500 dark:text-gray-400">
-                      {formatDate(comment.createdAt)}
+                      {formatDate(comment.created_at)}
                     </time>
                   </div>
                   <p className="mt-1 text-sm text-gray-700 dark:text-gray-300">
@@ -217,13 +219,14 @@ const QuestionDetail = ({ question, comments }: QuestionDetailProps) => {
             value={newComment}
             onChange={(e) => setNewComment(e.target.value)}
             className="min-h-[100px]"
+            disabled={!user}
           />
           <Button 
             onClick={handleAddComment}
             className="mt-4"
-            disabled={!newComment.trim()}
+            disabled={!newComment.trim() || !user}
           >
-            Post Comment
+            {user ? 'Post Comment' : 'Log in to comment'}
           </Button>
         </div>
       </motion.div>

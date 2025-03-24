@@ -1,46 +1,11 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import QuestionCard from '@/components/questions/QuestionCard';
-import { Question } from '@/lib/types';
+import { Question, Tag } from '@/lib/types';
 import TagBadge from '@/components/ui/TagBadge';
-
-// Sample data for featured questions
-const sampleQuestions: Question[] = [
-  {
-    id: '1',
-    title: 'How does reinforcement learning differ from supervised learning?',
-    content: 'I\'m trying to understand the key differences between reinforcement learning and supervised learning approaches in AI.',
-    answer: 'Supervised learning uses labeled data to teach models to make predictions, while reinforcement learning involves an agent learning to make decisions by taking actions in an environment to maximize rewards. Unlike supervised learning which has immediate feedback through labeled examples, reinforcement learning relies on delayed rewards and exploration of the environment. Supervised learning is used for classification and regression problems, while reinforcement learning is ideal for sequential decision-making tasks like game playing, robotics, and autonomous systems.',
-    tags: ['machine-learning', 'reinforcement-learning', 'ai-theory'],
-    createdAt: new Date('2023-10-22'),
-    updatedAt: new Date('2023-10-22'),
-    votes: 42,
-    author: 'user1'
-  },
-  {
-    id: '2',
-    title: 'Explaining quantum computing to a software developer',
-    content: 'As a traditional software developer, I\'m struggling to grasp quantum computing concepts. Can someone explain it in terms I might understand?',
-    answer: 'Quantum computing leverages quantum mechanics principles to process information in ways classical computers cannot. While classical computers use bits (0 or 1), quantum computers use qubits that can exist in multiple states simultaneously through superposition. This allows quantum computers to evaluate many possibilities at once. Another key concept is entanglement, where qubits become correlated so that the state of one instantly affects another, regardless of distance. For a software developer, think of it as extreme parallelism where instead of sequential operations or limited parallel threads, quantum algorithms can explore exponentially many paths simultaneously. This makes quantum computers potentially much faster for specific problems like factoring large numbers, search, and optimization.',
-    tags: ['quantum-computing', 'computer-science', 'beginners'],
-    createdAt: new Date('2023-10-15'),
-    updatedAt: new Date('2023-10-17'),
-    votes: 38,
-    author: 'user2'
-  },
-  {
-    id: '3',
-    title: 'Ethical considerations in developing AI systems',
-    content: 'What are the main ethical considerations that developers should keep in mind when building AI systems?',
-    answer: 'When developing AI systems, key ethical considerations include: 1) Bias and fairness - ensuring AI doesn\'t perpetuate or amplify existing societal biases; 2) Transparency and explainability - making sure decisions can be understood and explained; 3) Privacy - protecting personal data used to train and operate AI; 4) Accountability - establishing clear responsibility for AI actions; 5) Safety and security - preventing harmful outcomes or misuse; 6) Human autonomy - ensuring AI augments rather than replaces human decision-making in critical areas; 7) Social impact - considering effects on employment and society; and 8) Sustainability - accounting for environmental impacts of computing resources. Developers should implement ethics by design, conduct impact assessments, engage diverse stakeholders, and establish governance structures that continuously monitor systems.',
-    tags: ['ethics', 'ai-ethics', 'responsible-ai'],
-    createdAt: new Date('2023-10-12'),
-    updatedAt: new Date('2023-10-14'),
-    votes: 65,
-    author: 'user3'
-  }
-];
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 // Available filter categories
 const categories = [
@@ -51,6 +16,69 @@ const categories = [
 
 const FeaturedQuestions = () => {
   const [activeCategory, setActiveCategory] = useState('trending');
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [popularTags, setPopularTags] = useState<Tag[]>([]);
+  const [loading, setLoading] = useState(true);
+  
+  useEffect(() => {
+    const fetchQuestions = async () => {
+      setLoading(true);
+      try {
+        let query = supabase.from('questions').select('*');
+        
+        if (activeCategory === 'recent') {
+          query = query.order('created_at', { ascending: false });
+        } else if (activeCategory === 'most-voted') {
+          query = query.order('votes', { ascending: false });
+        } else {
+          // For trending, we might combine recency and votes in a real app
+          // For now, let's use votes as a proxy for trending
+          query = query.order('votes', { ascending: false });
+        }
+        
+        // Limit to 3 questions for the featured section
+        query = query.limit(3);
+        
+        const { data, error } = await query;
+        
+        if (error) {
+          console.error('Error fetching questions:', error);
+          toast.error('Failed to load featured questions');
+        } else {
+          setQuestions(data as Question[]);
+          
+          // Get all questions to extract popular tags
+          const { data: allQuestionsData } = await supabase
+            .from('questions')
+            .select('tags');
+          
+          if (allQuestionsData) {
+            // Extract and count all tags
+            const tagCounts: Record<string, number> = {};
+            allQuestionsData.forEach(q => {
+              q.tags.forEach((tag: string) => {
+                tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+              });
+            });
+            
+            // Convert to array and sort by count
+            const sortedTags = Object.entries(tagCounts)
+              .map(([name, count]) => ({ id: name, name, count }))
+              .sort((a, b) => b.count - a.count)
+              .slice(0, 5); // Get top 5 tags
+              
+            setPopularTags(sortedTags);
+          }
+        }
+      } catch (err) {
+        console.error('Error in fetchFeaturedQuestions:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchQuestions();
+  }, [activeCategory]);
   
   return (
     <section className="py-16 bg-white dark:bg-gray-900">
@@ -82,27 +110,42 @@ const FeaturedQuestions = () => {
 
         <div className="mt-12 grid gap-8 sm:grid-cols-1 lg:grid-cols-3 md:grid-cols-2">
           <AnimatePresence mode="wait">
-            {sampleQuestions.map((question) => (
-              <motion.div
-                key={question.id}
-                layout
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.3 }}
-              >
-                <QuestionCard question={question} />
-              </motion.div>
-            ))}
+            {loading ? (
+              // Loading skeletons
+              <>
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="glass-card p-6 rounded-xl animate-pulse">
+                    <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-3/4 mb-4"></div>
+                    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-full mb-2"></div>
+                    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-2/3"></div>
+                    <div className="mt-4 flex space-x-2">
+                      <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-16"></div>
+                      <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-16"></div>
+                    </div>
+                  </div>
+                ))}
+              </>
+            ) : (
+              questions.map((question) => (
+                <motion.div
+                  key={question.id}
+                  layout
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <QuestionCard question={question} />
+                </motion.div>
+              ))
+            )}
           </AnimatePresence>
         </div>
         
         <div className="mt-12 text-center">
-          <TagBadge tag="machine-learning" count={124} className="m-1" />
-          <TagBadge tag="ai-ethics" count={86} className="m-1" />
-          <TagBadge tag="computer-vision" count={72} className="m-1" />
-          <TagBadge tag="natural-language-processing" count={65} className="m-1" />
-          <TagBadge tag="deep-learning" count={58} className="m-1" />
+          {popularTags.map((tag) => (
+            <TagBadge key={tag.id} tag={tag.name} count={tag.count} className="m-1" />
+          ))}
         </div>
       </div>
     </section>

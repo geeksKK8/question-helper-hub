@@ -4,6 +4,8 @@ import { ThumbsUp, MessageSquare, Clock } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import TagBadge from '@/components/ui/TagBadge';
 import { Question } from '@/lib/types';
+import { supabase } from '@/integrations/supabase/client';
+import { useEffect, useState } from 'react';
 
 interface QuestionCardProps {
   question: Question;
@@ -11,14 +13,31 @@ interface QuestionCardProps {
 
 const QuestionCard = ({ question }: QuestionCardProps) => {
   const { id, title, content, tags, votes } = question;
+  const [commentCount, setCommentCount] = useState(0);
+  
+  useEffect(() => {
+    // Fetch comment count for this question
+    const fetchCommentCount = async () => {
+      const { count, error } = await supabase
+        .from('comments')
+        .select('*', { count: 'exact', head: true })
+        .eq('question_id', id);
+      
+      if (!error && count !== null) {
+        setCommentCount(count);
+      }
+    };
+    
+    fetchCommentCount();
+  }, [id]);
   
   // Format the date to a readable string
-  const formatDate = (date: Date) => {
+  const formatDate = (dateString: string) => {
     return new Intl.DateTimeFormat('en-US', {
       month: 'short',
       day: 'numeric',
       year: 'numeric'
-    }).format(new Date(date));
+    }).format(new Date(dateString));
   };
 
   return (
@@ -46,18 +65,18 @@ const QuestionCard = ({ question }: QuestionCardProps) => {
 
       <div className="mt-4 flex items-center justify-between text-sm text-gray-500 dark:text-gray-400">
         <div className="flex items-center space-x-4">
-          <button className="flex items-center space-x-1 hover:text-gray-700 dark:hover:text-gray-200 transition-colors">
+          <div className="flex items-center space-x-1">
             <ThumbsUp className="h-4 w-4" />
             <span>{votes}</span>
-          </button>
-          <button className="flex items-center space-x-1 hover:text-gray-700 dark:hover:text-gray-200 transition-colors">
+          </div>
+          <div className="flex items-center space-x-1">
             <MessageSquare className="h-4 w-4" />
-            <span>12</span>
-          </button>
+            <span>{commentCount}</span>
+          </div>
         </div>
         <div className="flex items-center space-x-1">
           <Clock className="h-4 w-4" />
-          <span>{formatDate(question.createdAt)}</span>
+          <span>{formatDate(question.created_at)}</span>
         </div>
       </div>
     </motion.div>

@@ -8,6 +8,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { motion } from 'framer-motion';
+import { toast } from 'sonner';
+import { populateDatabase } from '@/utils/populateDb';
 
 const Profile = () => {
   useRequireAuth(); // Redirect if not logged in
@@ -19,6 +21,7 @@ const Profile = () => {
     bio: '',
   });
   const [isEditing, setIsEditing] = useState(false);
+  const [isPopulating, setIsPopulating] = useState(false);
 
   useEffect(() => {
     if (profile) {
@@ -40,6 +43,28 @@ const Profile = () => {
     e.preventDefault();
     await updateProfile(formData);
     setIsEditing(false);
+  };
+
+  const handlePopulateDatabase = async () => {
+    if (!user) {
+      toast.error('You must be logged in to populate the database');
+      return;
+    }
+
+    setIsPopulating(true);
+    try {
+      const result = await populateDatabase(user.id);
+      if (result.success) {
+        toast.success('Sample questions added to the database successfully!');
+      } else {
+        toast.error(`Failed to populate database: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Error populating database:', error);
+      toast.error('An unexpected error occurred while populating the database');
+    } finally {
+      setIsPopulating(false);
+    }
   };
 
   const getInitials = (name: string) => {
@@ -197,6 +222,22 @@ const Profile = () => {
                       </dd>
                     </div>
                   </dl>
+                </div>
+                
+                <div className="border-t border-gray-200 dark:border-gray-700 mt-6 pt-4">
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-white">Developer Tools</h3>
+                  <div className="mt-4">
+                    <Button 
+                      variant="outline" 
+                      onClick={handlePopulateDatabase}
+                      disabled={isPopulating}
+                    >
+                      {isPopulating ? 'Adding Sample Data...' : 'Populate Sample Questions'}
+                    </Button>
+                    <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                      This will add sample questions to the database if none exist yet.
+                    </p>
+                  </div>
                 </div>
               </div>
             )}

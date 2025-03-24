@@ -9,6 +9,38 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      comments: {
+        Row: {
+          author_id: string
+          content: string
+          created_at: string
+          id: string
+          question_id: string
+        }
+        Insert: {
+          author_id: string
+          content: string
+          created_at?: string
+          id?: string
+          question_id: string
+        }
+        Update: {
+          author_id?: string
+          content?: string
+          created_at?: string
+          id?: string
+          question_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comments_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "questions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -36,6 +68,42 @@ export type Database = {
           id?: string
           updated_at?: string
           username?: string | null
+        }
+        Relationships: []
+      }
+      questions: {
+        Row: {
+          answer: string
+          author_id: string
+          content: string
+          created_at: string
+          id: string
+          tags: string[]
+          title: string
+          updated_at: string
+          votes: number
+        }
+        Insert: {
+          answer: string
+          author_id: string
+          content: string
+          created_at?: string
+          id?: string
+          tags?: string[]
+          title: string
+          updated_at?: string
+          votes?: number
+        }
+        Update: {
+          answer?: string
+          author_id?: string
+          content?: string
+          created_at?: string
+          id?: string
+          tags?: string[]
+          title?: string
+          updated_at?: string
+          votes?: number
         }
         Relationships: []
       }
