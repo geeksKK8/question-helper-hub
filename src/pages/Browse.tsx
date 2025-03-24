@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Filter } from 'lucide-react';
@@ -47,7 +46,7 @@ const sampleQuestions: Question[] = [
     id: '4',
     title: 'Best practices for fine-tuning large language models',
     content: 'I want to fine-tune a large language model for a specific domain. What are the current best practices to achieve good results while keeping costs reasonable?',
-    answer: 'When fine-tuning large language models, consider these best practices: 1) Curate high-quality training data that's representative of your target domain and task; 2) Use parameter-efficient fine-tuning methods like LoRA, QLoRA, or adapter-based approaches to reduce computational costs; 3) Implement early stopping and evaluate on a validation set to prevent overfitting; 4) Consider instruction tuning with carefully designed prompts if your goal is to improve the model\'s ability to follow instructions; 5) Use smaller models if possible - smaller models fine-tuned on domain-specific data often outperform larger general models; 6) For cost efficiency, optimize batch size and precision (e.g., using mixed precision training); 7) Implement proper evaluation metrics relevant to your specific use case; and 8) Document your fine-tuning process, including hyperparameters and data processing steps, to ensure reproducibility.',
+    answer: 'When fine-tuning large language models, consider these best practices: 1) Curate high-quality training data that\'s representative of your target domain and task; 2) Use parameter-efficient fine-tuning methods like LoRA, QLoRA, or adapter-based approaches to reduce computational costs; 3) Implement early stopping and evaluate on a validation set to prevent overfitting; 4) Consider instruction tuning with carefully designed prompts if your goal is to improve the model\'s ability to follow instructions; 5) Use smaller models if possible - smaller models fine-tuned on domain-specific data often outperform larger general models; 6) For cost efficiency, optimize batch size and precision (e.g., using mixed precision training); 7) Implement proper evaluation metrics relevant to your specific use case; and 8) Document your fine-tuning process, including hyperparameters and data processing steps, to ensure reproducibility.',
     tags: ['language-models', 'fine-tuning', 'nlp', 'cost-optimization'],
     createdAt: new Date('2023-09-28'),
     updatedAt: new Date('2023-09-30'),
