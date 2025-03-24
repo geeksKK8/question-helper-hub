@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Filter } from 'lucide-react';
@@ -56,7 +57,7 @@ const sampleQuestions: Question[] = [
   {
     id: '5',
     title: 'How to implement semantic search with vector embeddings',
-    content: 'I want to build a semantic search system for my document database. What's the current state-of-the-art approach using vector embeddings?',
+    content: 'I want to build a semantic search system for my document database. What\'s the current state-of-the-art approach using vector embeddings?',
     answer: 'To implement semantic search with vector embeddings: 1) Generate embeddings for your documents using models like OpenAI\'s text-embedding-ada-002, Sentence-BERT, or other domain-specific embedding models; 2) Store these embeddings in a vector database like Pinecone, Weaviate, Milvus, or FAISS for efficient similarity search; 3) At query time, convert the search query into an embedding using the same model; 4) Perform approximate nearest neighbor search to find documents with embeddings most similar to the query embedding; 5) Consider hybrid approaches that combine semantic search with keyword-based search for better results; 6) Implement re-ranking on top results to improve precision; and 7) For large document collections, use chunking strategies to break documents into smaller semantic units before embedding. This approach enables finding contextually relevant results even when exact keywords don\'t match, greatly improving search quality compared to traditional keyword-based approaches.',
     tags: ['semantic-search', 'embeddings', 'vector-database', 'information-retrieval'],
     createdAt: new Date('2023-09-18'),
