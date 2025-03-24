@@ -1,13 +1,24 @@
 
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { Search, Menu, X } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Search, Menu, X, UserCircle, LogOut } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { AnimatePresence, motion } from 'framer-motion';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuSeparator, 
+  DropdownMenuTrigger 
+} from '@/components/ui/dropdown-menu';
+import { useAuth } from '@/contexts/AuthContext';
 
 export const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const { user, profile, signOut } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -21,6 +32,19 @@ export const Navbar = () => {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/');
+  };
+
+  const getInitials = (name: string) => {
+    return name
+      .split(' ')
+      .map((n) => n[0])
+      .join('')
+      .toUpperCase();
+  };
 
   return (
     <header 
@@ -68,9 +92,44 @@ export const Navbar = () => {
               <Search className="h-4 w-4 mr-2" />
               Search
             </Button>
-            <Button className="rounded-full transition-all glass-button">
-              Sign In
-            </Button>
+            
+            {user ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="rounded-full h-8 w-8 p-0">
+                    <Avatar className="h-8 w-8">
+                      {profile?.avatar_url ? (
+                        <AvatarImage src={profile.avatar_url} alt={profile?.username || user.email || ''} />
+                      ) : (
+                        <AvatarFallback>
+                          {profile?.full_name 
+                            ? getInitials(profile.full_name) 
+                            : profile?.username?.charAt(0).toUpperCase() || user.email?.charAt(0).toUpperCase() || 'U'}
+                        </AvatarFallback>
+                      )}
+                    </Avatar>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => navigate('/profile')}>
+                    <UserCircle className="mr-2 h-4 w-4" />
+                    Profile
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleSignOut}>
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Sign out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <Button 
+                className="rounded-full transition-all glass-button"
+                onClick={() => navigate('/auth')}
+              >
+                Sign In
+              </Button>
+            )}
           </div>
 
           {/* Mobile menu button */}
@@ -129,11 +188,41 @@ export const Navbar = () => {
                   Search
                 </Button>
               </div>
-              <div className="px-3 py-2">
-                <Button className="w-full rounded-full glass-button">
-                  Sign In
-                </Button>
-              </div>
+              {user ? (
+                <>
+                  <Link 
+                    to="/profile" 
+                    className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 dark:text-gray-200 hover:text-black dark:hover:text-white"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    Profile
+                  </Link>
+                  <div className="px-3 py-2">
+                    <Button 
+                      variant="outline" 
+                      className="w-full rounded-full"
+                      onClick={() => {
+                        handleSignOut();
+                        setIsMenuOpen(false);
+                      }}
+                    >
+                      Sign Out
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <div className="px-3 py-2">
+                  <Button 
+                    className="w-full rounded-full glass-button"
+                    onClick={() => {
+                      navigate('/auth');
+                      setIsMenuOpen(false);
+                    }}
+                  >
+                    Sign In
+                  </Button>
+                </div>
+              )}
             </div>
           </motion.div>
         )}
