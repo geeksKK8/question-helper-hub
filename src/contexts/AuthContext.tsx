@@ -28,6 +28,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log("Auth state changed:", event, "Session:", session ? "exists" : "null");
         setSession(session);
         setUser(session?.user ?? null);
         
@@ -53,6 +54,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // THEN check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log("Existing session check:", session ? "found" : "not found");
       setSession(session);
       setUser(session?.user ?? null);
       
@@ -137,6 +139,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsLoading(true);
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
+      
+      // Clear session storage after sign out
+      sessionStorage.removeItem('supabase.auth.token');
+      
       toast({
         title: 'Signed out',
         description: 'You have been successfully signed out',
