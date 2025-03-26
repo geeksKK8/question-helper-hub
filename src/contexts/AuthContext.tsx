@@ -140,8 +140,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
       
-      // Clear session storage after sign out
-      sessionStorage.removeItem('supabase.auth.token');
+      // Clear localStorage after sign out - this is changed from sessionStorage
+      localStorage.removeItem('supabase.auth.token');
       
       toast({
         title: 'Signed out',
