@@ -7,10 +7,13 @@ import { Textarea } from '@/components/ui/textarea';
 import TagBadge from '@/components/ui/TagBadge';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
-import { PlusCircle, X } from 'lucide-react';
+import { PlusCircle, X, Send } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 
 const QuestionForm = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [formData, setFormData] = useState({
     title: '',
     question: '',
@@ -19,6 +22,7 @@ const QuestionForm = () => {
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
   const [currentStep, setCurrentStep] = useState(1);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const totalSteps = 3;
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -70,7 +74,7 @@ const QuestionForm = () => {
     setCurrentStep((prev) => Math.max(prev - 1, 1));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!formData.answer.trim()) {
@@ -82,25 +86,56 @@ const QuestionForm = () => {
       toast.error('Please add at least one tag');
       return;
     }
+
+    if (!user) {
+      toast.error('You must be logged in to submit a question');
+      return;
+    }
     
-    // Here you would typically make an API call to submit the question
-    console.log({ ...formData, tags });
-    
-    toast.success('Your question has been submitted successfully!');
-    
-    // Reset form data
-    setFormData({
-      title: '',
-      question: '',
-      answer: '',
-    });
-    setTags([]);
-    setCurrentStep(1);
-    
-    // Navigate to homepage
-    setTimeout(() => {
-      navigate('/');
-    }, 1500);
+    try {
+      setIsSubmitting(true);
+      
+      // Submit to Supabase
+      const { data, error } = await supabase
+        .from('questions')
+        .insert([
+          {
+            title: formData.title,
+            content: formData.question,
+            answer: formData.answer,
+            tags,
+            author_id: user.id
+          }
+        ])
+        .select();
+      
+      if (error) throw error;
+      
+      toast.success('Your question has been submitted successfully!');
+      
+      // Reset form data
+      setFormData({
+        title: '',
+        question: '',
+        answer: '',
+      });
+      setTags([]);
+      setCurrentStep(1);
+      
+      // Navigate to the newly created question
+      setTimeout(() => {
+        if (data && data[0]) {
+          navigate(`/question/${data[0].id}`);
+        } else {
+          navigate('/');
+        }
+      }, 1500);
+    } catch (error: any) {
+      toast.error(`Error submitting question: ${error.message}`);
+      console.error('Error submitting question:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const formVariants = {
@@ -111,10 +146,10 @@ const QuestionForm = () => {
 
   return (
     <div className="container mx-auto max-w-3xl px-4 sm:px-6 lg:px-8 py-8">
-      <div className="glass-card p-8 rounded-xl">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white text-center mb-8">
+      <div className="bg-white dark:bg-gray-800 shadow-md rounded-xl p-8">
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white text-center mb-8">
           Submit Your Question
-        </h1>
+        </h2>
         
         <div className="mb-8">
           <div className="relative">
@@ -284,8 +319,9 @@ const QuestionForm = () => {
                 Next
               </Button>
             ) : (
-              <Button type="submit">
-                Submit Question
+              <Button type="submit" disabled={isSubmitting} className="gap-2">
+                {isSubmitting ? 'Submitting...' : 'Submit Question'}
+                <Send className="h-4 w-4" />
               </Button>
             )}
           </div>
