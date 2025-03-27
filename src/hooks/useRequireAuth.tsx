@@ -5,14 +5,15 @@ import { useAuth } from '@/contexts/AuthContext';
 
 // This hook redirects to the login page if the user is not authenticated
 export default function useRequireAuth(redirectUrl = '/auth') {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, session } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!isLoading && !user) {
+    // Only redirect if we're done loading and there's no session
+    if (!isLoading && !session) {
       navigate(redirectUrl);
     }
-  }, [user, isLoading, navigate, redirectUrl]);
+  }, [session, isLoading, navigate, redirectUrl]);
 
-  return { user, isLoading };
+  return { user, isLoading, session };
 }
