@@ -92,7 +92,9 @@ const Browse = () => {
   const filteredQuestions = questions.filter(question => {
     const matchesSearch = searchTerm === '' || 
       question.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      question.content.toLowerCase().includes(searchTerm.toLowerCase());
+      question.content.some(content => 
+        content.toLowerCase().includes(searchTerm.toLowerCase())
+      );
     
     const matchesTags = selectedTags.length === 0 || 
       selectedTags.every(tag => question.tags.includes(tag));
