@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ThumbsUp, ThumbsDown, MessageSquare, Share, Flag, Edit } from 'lucide-react';
@@ -48,7 +47,6 @@ const QuestionDetail = ({ question, comments, onAddComment, onVote }: QuestionDe
   };
 
   const handleSaveEdit = () => {
-    // Here you would typically make an API call to update the answer
     setIsEditing(false);
     toast.success('Answer updated successfully');
   };
@@ -80,7 +78,6 @@ const QuestionDetail = ({ question, comments, onAddComment, onVote }: QuestionDe
     visible: { opacity: 1, y: 0 }
   };
 
-  // Create pairs of questions and answers
   const questionAnswerPairs = question.content.map((content, index) => {
     return { 
       question: content, 
@@ -88,7 +85,6 @@ const QuestionDetail = ({ question, comments, onAddComment, onVote }: QuestionDe
     };
   });
 
-  // Markdown rendering component with proper styling
   const MarkdownContent = ({ content }: { content: string }) => (
     <div className="prose dark:prose-invert max-w-none prose-pre:bg-gray-800 prose-pre:text-white prose-pre:p-4 prose-pre:rounded-md prose-code:text-blue-600 dark:prose-code:text-blue-400 prose-a:text-blue-600 dark:prose-a:text-blue-400 prose-img:rounded-lg prose-img:mx-auto">
       <ReactMarkdown 
@@ -97,11 +93,12 @@ const QuestionDetail = ({ question, comments, onAddComment, onVote }: QuestionDe
           a: ({ node, ...props }) => (
             <a {...props} className="text-blue-600 dark:text-blue-400 hover:underline" target="_blank" rel="noopener noreferrer" />
           ),
-          code: ({ node, inline, ...props }) => (
-            inline 
-              ? <code {...props} className="px-1 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-sm" />
-              : <code {...props} className="block p-4 rounded bg-gray-100 dark:bg-gray-800 text-sm overflow-x-auto" />
-          ),
+          code: ({ node, className, children, ...props }: any) => {
+            const isInline = !props.className;
+            return isInline 
+              ? <code {...props} className="px-1 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-sm">{children}</code>
+              : <code {...props} className="block p-4 rounded bg-gray-100 dark:bg-gray-800 text-sm overflow-x-auto">{children}</code>;
+          },
           pre: ({ node, ...props }) => (
             <pre {...props} className="p-4 rounded bg-gray-100 dark:bg-gray-800 overflow-x-auto" />
           ),
@@ -144,7 +141,6 @@ const QuestionDetail = ({ question, comments, onAddComment, onVote }: QuestionDe
         </div>
       </motion.div>
 
-      {/* Question-Answer pairs */}
       {questionAnswerPairs.map((pair, index) => (
         <motion.div 
           key={index}
