@@ -2,6 +2,8 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ThumbsUp, ThumbsDown, MessageSquare, Share, Flag, Edit } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import TagBadge from '@/components/ui/TagBadge';
 import { Question, Comment } from '@/lib/types';
 import { Button } from '@/components/ui/button';
@@ -86,6 +88,41 @@ const QuestionDetail = ({ question, comments, onAddComment, onVote }: QuestionDe
     };
   });
 
+  // Markdown rendering component with proper styling
+  const MarkdownContent = ({ content }: { content: string }) => (
+    <div className="prose dark:prose-invert max-w-none prose-pre:bg-gray-800 prose-pre:text-white prose-pre:p-4 prose-pre:rounded-md prose-code:text-blue-600 dark:prose-code:text-blue-400 prose-a:text-blue-600 dark:prose-a:text-blue-400 prose-img:rounded-lg prose-img:mx-auto">
+      <ReactMarkdown 
+        remarkPlugins={[remarkGfm]}
+        components={{
+          a: ({ node, ...props }) => (
+            <a {...props} className="text-blue-600 dark:text-blue-400 hover:underline" target="_blank" rel="noopener noreferrer" />
+          ),
+          code: ({ node, inline, ...props }) => (
+            inline 
+              ? <code {...props} className="px-1 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-sm" />
+              : <code {...props} className="block p-4 rounded bg-gray-100 dark:bg-gray-800 text-sm overflow-x-auto" />
+          ),
+          pre: ({ node, ...props }) => (
+            <pre {...props} className="p-4 rounded bg-gray-100 dark:bg-gray-800 overflow-x-auto" />
+          ),
+          table: ({ node, ...props }) => (
+            <div className="overflow-x-auto">
+              <table {...props} className="border-collapse border border-gray-300 dark:border-gray-700" />
+            </div>
+          ),
+          th: ({ node, ...props }) => (
+            <th {...props} className="border border-gray-300 dark:border-gray-700 px-4 py-2 bg-gray-100 dark:bg-gray-800" />
+          ),
+          td: ({ node, ...props }) => (
+            <td {...props} className="border border-gray-300 dark:border-gray-700 px-4 py-2" />
+          ),
+        }}
+      >
+        {content}
+      </ReactMarkdown>
+    </div>
+  );
+
   return (
     <motion.div 
       variants={containerVariants}
@@ -116,9 +153,7 @@ const QuestionDetail = ({ question, comments, onAddComment, onVote }: QuestionDe
         >
           <div className="mb-8 border-b pb-6 border-gray-200 dark:border-gray-700">
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Question {index + 1}</h2>
-            <div className="prose dark:prose-invert max-w-none">
-              <p className="text-gray-700 dark:text-gray-300">{pair.question}</p>
-            </div>
+            <MarkdownContent content={pair.question} />
           </div>
 
           <div>
@@ -138,9 +173,7 @@ const QuestionDetail = ({ question, comments, onAddComment, onVote }: QuestionDe
                 </div>
               </div>
             ) : (
-              <div className="prose dark:prose-invert max-w-none">
-                <p className="text-gray-700 dark:text-gray-300">{pair.answer}</p>
-              </div>
+              <MarkdownContent content={pair.answer} />
             )}
           </div>
         </motion.div>
