@@ -94,12 +94,6 @@ const JsonUploader = () => {
     try {
       setIsUploading(true);
       
-      // Combine all user questions into a single content
-      const questionContent = parsedData.userQuestions.join('\n\n');
-      
-      // Combine all AI answers into a single answer
-      const answerContent = parsedData.aiAnswers.join('\n\n');
-      
       // Default tags based on content
       const defaultTags = ['imported', 'json'];
       
@@ -109,8 +103,8 @@ const JsonUploader = () => {
         .insert([
           {
             title: parsedData.title,
-            content: questionContent,
-            answer: answerContent,
+            content: parsedData.userQuestions,
+            answer: parsedData.aiAnswers,
             tags: defaultTags,
             author_id: user.id
           }

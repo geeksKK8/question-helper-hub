@@ -73,9 +73,9 @@ export type Database = {
       }
       questions: {
         Row: {
-          answer: string
+          answer: string[]
           author_id: string
-          content: string
+          content: string[]
           created_at: string
           id: string
           tags: string[]
@@ -84,9 +84,9 @@ export type Database = {
           votes: number
         }
         Insert: {
-          answer: string
+          answer: string[]
           author_id: string
-          content: string
+          content: string[]
           created_at?: string
           id?: string
           tags?: string[]
@@ -95,9 +95,9 @@ export type Database = {
           votes?: number
         }
         Update: {
-          answer?: string
+          answer?: string[]
           author_id?: string
-          content?: string
+          content?: string[]
           created_at?: string
           id?: string
           tags?: string[]

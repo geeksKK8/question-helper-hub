@@ -2,8 +2,8 @@
 export interface Question {
   id: string;
   title: string;
-  content: string;
-  answer: string;
+  content: string[];
+  answer: string[];
   tags: string[];
   created_at: string;
   updated_at: string;

@@ -18,7 +18,7 @@ interface QuestionDetailProps {
 
 const QuestionDetail = ({ question, comments, onAddComment, onVote }: QuestionDetailProps) => {
   const [isEditing, setIsEditing] = useState(false);
-  const [editedAnswer, setEditedAnswer] = useState(question.answer);
+  const [editedAnswer, setEditedAnswer] = useState(question.answer[0] || '');
   const [newComment, setNewComment] = useState('');
   const [voted, setVoted] = useState<'up' | 'down' | null>(null);
   const { user } = useAuth();
@@ -78,6 +78,14 @@ const QuestionDetail = ({ question, comments, onAddComment, onVote }: QuestionDe
     visible: { opacity: 1, y: 0 }
   };
 
+  // Create pairs of questions and answers
+  const questionAnswerPairs = question.content.map((content, index) => {
+    return { 
+      question: content, 
+      answer: question.answer[index] || "No answer provided for this question."
+    };
+  });
+
   return (
     <motion.div 
       variants={containerVariants}
@@ -92,10 +100,6 @@ const QuestionDetail = ({ question, comments, onAddComment, onVote }: QuestionDe
           <span>Posted on {formatDate(question.created_at)}</span>
         </div>
         
-        <div className="mt-6 prose dark:prose-invert max-w-none">
-          <p className="text-gray-700 dark:text-gray-300">{question.content}</p>
-        </div>
-        
         <div className="mt-4 flex flex-wrap gap-2">
           {question.tags.map(tag => (
             <TagBadge key={tag} tag={tag} />
@@ -103,29 +107,47 @@ const QuestionDetail = ({ question, comments, onAddComment, onVote }: QuestionDe
         </div>
       </motion.div>
 
-      <motion.div variants={itemVariants} className="glass-card p-8 rounded-xl mb-8">
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Answer</h2>
-        
-        {isEditing ? (
-          <div className="mt-4">
-            <Textarea 
-              value={editedAnswer}
-              onChange={(e) => setEditedAnswer(e.target.value)}
-              className="min-h-[200px]"
-              placeholder="Edit the answer..."
-            />
-            <div className="mt-4 flex space-x-2">
-              <Button onClick={handleSaveEdit}>Save Changes</Button>
-              <Button variant="outline" onClick={() => setIsEditing(false)}>Cancel</Button>
+      {/* Question-Answer pairs */}
+      {questionAnswerPairs.map((pair, index) => (
+        <motion.div 
+          key={index}
+          variants={itemVariants} 
+          className="glass-card p-8 rounded-xl mb-8"
+        >
+          <div className="mb-8 border-b pb-6 border-gray-200 dark:border-gray-700">
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Question {index + 1}</h2>
+            <div className="prose dark:prose-invert max-w-none">
+              <p className="text-gray-700 dark:text-gray-300">{pair.question}</p>
             </div>
           </div>
-        ) : (
-          <div className="prose dark:prose-invert max-w-none">
-            <p className="text-gray-700 dark:text-gray-300">{question.answer}</p>
+
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Answer</h2>
+            
+            {isEditing && index === 0 ? (
+              <div className="mt-4">
+                <Textarea 
+                  value={editedAnswer}
+                  onChange={(e) => setEditedAnswer(e.target.value)}
+                  className="min-h-[200px]"
+                  placeholder="Edit the answer..."
+                />
+                <div className="mt-4 flex space-x-2">
+                  <Button onClick={handleSaveEdit}>Save Changes</Button>
+                  <Button variant="outline" onClick={() => setIsEditing(false)}>Cancel</Button>
+                </div>
+              </div>
+            ) : (
+              <div className="prose dark:prose-invert max-w-none">
+                <p className="text-gray-700 dark:text-gray-300">{pair.answer}</p>
+              </div>
+            )}
           </div>
-        )}
-        
-        <div className="mt-6 flex items-center justify-between">
+        </motion.div>
+      ))}
+
+      <motion.div variants={itemVariants} className="glass-card p-8 rounded-xl mb-8">        
+        <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <button 
               onClick={() => handleVote('up')}

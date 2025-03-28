@@ -53,7 +53,7 @@ const QuestionCard = ({ question }: QuestionCardProps) => {
           {title}
         </h3>
         <p className="mt-2 text-gray-600 dark:text-gray-300 line-clamp-2">
-          {content}
+          {content[0]}
         </p>
       </Link>
 

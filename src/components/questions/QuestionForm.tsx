@@ -95,14 +95,14 @@ const QuestionForm = () => {
     try {
       setIsSubmitting(true);
       
-      // Submit to Supabase
+      // Submit to Supabase - now using arrays for content and answer
       const { data, error } = await supabase
         .from('questions')
         .insert([
           {
             title: formData.title,
-            content: formData.question,
-            answer: formData.answer,
+            content: [formData.question],
+            answer: [formData.answer],
             tags,
             author_id: user.id
           }
