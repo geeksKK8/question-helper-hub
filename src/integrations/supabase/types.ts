@@ -82,6 +82,7 @@ export type Database = {
           title: string
           updated_at: string
           votes: number
+          url: string | null
         }
         Insert: {
           answer: string[]
@@ -93,6 +94,7 @@ export type Database = {
           title: string
           updated_at?: string
           votes?: number
+          url?: string | null
         }
         Update: {
           answer?: string[]
@@ -104,6 +106,7 @@ export type Database = {
           title?: string
           updated_at?: string
           votes?: number
+          url?: string | null
         }
         Relationships: []
       }

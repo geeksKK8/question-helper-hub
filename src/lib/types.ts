@@ -1,4 +1,3 @@
-
 export interface Question {
   id: string;
   title: string;
@@ -9,6 +8,7 @@ export interface Question {
   updated_at: string;
   votes: number;
   author_id: string;
+  url?: string;
 }
 
 export interface Comment {

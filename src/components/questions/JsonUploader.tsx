@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -18,6 +17,7 @@ interface ParsedJson {
   title: string;
   userQuestions: string[];
   aiAnswers: string[];
+  url?: string;
 }
 
 const JsonUploader = () => {
@@ -82,6 +82,7 @@ const JsonUploader = () => {
       }
 
       const title = chatSession.title || 'Untitled Conversation';
+      const url = jsonData?.url;
       
       // Extract user questions and AI answers
       const userQuestions: string[] = [];
@@ -99,7 +100,7 @@ const JsonUploader = () => {
         throw new Error('No user questions found in the JSON file');
       }
 
-      setParsedData({ title, userQuestions, aiAnswers });
+      setParsedData({ title, userQuestions, aiAnswers, url });
       toast.success('JSON file parsed successfully');
     } catch (error: any) {
       toast.error(`Error parsing JSON: ${error.message}`);
@@ -137,7 +138,8 @@ const JsonUploader = () => {
             content: parsedData.userQuestions,
             answer: parsedData.aiAnswers,
             tags: tags,
-            author_id: user.id
+            author_id: user.id,
+            url: parsedData.url
           }
         ])
         .select();

@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ThumbsUp, ThumbsDown, MessageSquare, Share, Flag, Edit, Save, X, PlusCircle } from 'lucide-react';
@@ -200,6 +199,16 @@ const QuestionDetail = ({
         
         <div className="mt-4 flex items-center text-sm text-gray-500 dark:text-gray-400">
           <span>Posted on {formatDate(question.created_at)}</span>
+          {question.url && (
+            <a 
+              href={question.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="ml-4 text-blue-600 dark:text-blue-400 hover:underline flex items-center"
+            >
+              <span>Source Link</span>
+            </a>
+          )}
         </div>
         
         {!isEditingTags ? (
