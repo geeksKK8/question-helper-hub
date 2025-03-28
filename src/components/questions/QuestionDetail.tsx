@@ -1,12 +1,14 @@
+
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ThumbsUp, ThumbsDown, MessageSquare, Share, Flag, Edit } from 'lucide-react';
+import { ThumbsUp, ThumbsDown, MessageSquare, Share, Flag, Edit, Save, X, PlusCircle } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import TagBadge from '@/components/ui/TagBadge';
 import { Question, Comment } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -15,14 +17,28 @@ interface QuestionDetailProps {
   comments: Comment[];
   onAddComment: (content: string) => Promise<void>;
   onVote: (type: 'up' | 'down') => Promise<void>;
+  onUpdateTags?: (tags: string[]) => Promise<void>;
+  onUpdateAnswer?: (answerIndex: number, content: string) => Promise<void>;
 }
 
-const QuestionDetail = ({ question, comments, onAddComment, onVote }: QuestionDetailProps) => {
-  const [isEditing, setIsEditing] = useState(false);
-  const [editedAnswer, setEditedAnswer] = useState(question.answer[0] || '');
+const QuestionDetail = ({ 
+  question, 
+  comments, 
+  onAddComment, 
+  onVote,
+  onUpdateTags,
+  onUpdateAnswer 
+}: QuestionDetailProps) => {
+  const [editingAnswerIndex, setEditingAnswerIndex] = useState<number | null>(null);
+  const [editedAnswer, setEditedAnswer] = useState('');
   const [newComment, setNewComment] = useState('');
   const [voted, setVoted] = useState<'up' | 'down' | null>(null);
   const { user } = useAuth();
+  
+  // Tag editing state
+  const [isEditingTags, setIsEditingTags] = useState(false);
+  const [tags, setTags] = useState<string[]>(question.tags);
+  const [tagInput, setTagInput] = useState('');
   
   const formatDate = (dateString: string) => {
     return new Intl.DateTimeFormat('en-US', {
@@ -46,9 +62,22 @@ const QuestionDetail = ({ question, comments, onAddComment, onVote }: QuestionDe
     toast.success('Link copied to clipboard');
   };
 
-  const handleSaveEdit = () => {
-    setIsEditing(false);
-    toast.success('Answer updated successfully');
+  const handleSaveEdit = async () => {
+    if (editingAnswerIndex !== null && onUpdateAnswer) {
+      await onUpdateAnswer(editingAnswerIndex, editedAnswer);
+      setEditingAnswerIndex(null);
+      toast.success('Answer updated successfully');
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingAnswerIndex(null);
+    setEditedAnswer('');
+  };
+
+  const handleEditAnswer = (index: number) => {
+    setEditingAnswerIndex(index);
+    setEditedAnswer(question.answer[index] || '');
   };
 
   const handleAddComment = async () => {
@@ -61,6 +90,45 @@ const QuestionDetail = ({ question, comments, onAddComment, onVote }: QuestionDe
     
     await onAddComment(newComment);
     setNewComment('');
+  };
+
+  // Tag management functions
+  const handleAddTag = () => {
+    if (!tagInput.trim()) return;
+    if (tags.includes(tagInput.trim())) {
+      toast.error('Tag already exists');
+      return;
+    }
+    if (tags.length >= 5) {
+      toast.error('Maximum 5 tags allowed');
+      return;
+    }
+    setTags([...tags, tagInput.trim()]);
+    setTagInput('');
+  };
+
+  const handleRemoveTag = (tagToRemove: string) => {
+    setTags(tags.filter((tag) => tag !== tagToRemove));
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleAddTag();
+    }
+  };
+
+  const handleSaveTags = async () => {
+    if (tags.length === 0) {
+      toast.error('Please add at least one tag');
+      return;
+    }
+
+    if (onUpdateTags) {
+      await onUpdateTags(tags);
+      toast.success('Tags updated successfully');
+    }
+    setIsEditingTags(false);
   };
 
   const containerVariants = {
@@ -134,11 +202,66 @@ const QuestionDetail = ({ question, comments, onAddComment, onVote }: QuestionDe
           <span>Posted on {formatDate(question.created_at)}</span>
         </div>
         
-        <div className="mt-4 flex flex-wrap gap-2">
-          {question.tags.map(tag => (
-            <TagBadge key={tag} tag={tag} />
-          ))}
-        </div>
+        {!isEditingTags ? (
+          <div className="mt-4 flex flex-wrap gap-2">
+            {question.tags.map(tag => (
+              <TagBadge key={tag} tag={tag} />
+            ))}
+            {user && (
+              <button 
+                onClick={() => setIsEditingTags(true)}
+                className="inline-flex items-center rounded-full px-3 py-1 text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+              >
+                <Edit className="h-3 w-3 mr-1" />
+                Edit Tags
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="mt-4 space-y-3">
+            <div className="flex items-center space-x-2">
+              <Input
+                placeholder="Add tag..."
+                value={tagInput}
+                onChange={(e) => setTagInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                className="flex-1"
+              />
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={handleAddTag}
+                size="icon"
+              >
+                <PlusCircle className="h-5 w-5" />
+              </Button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {tags.map((tag) => (
+                <div 
+                  key={tag} 
+                  className="flex items-center bg-gray-100 text-gray-800 rounded-full px-3 py-1 text-sm dark:bg-gray-700 dark:text-gray-200"
+                >
+                  <span>{tag}</span>
+                  <button 
+                    type="button" 
+                    onClick={() => handleRemoveTag(tag)}
+                    className="ml-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div className="flex space-x-2">
+              <Button onClick={handleSaveTags} size="sm">Save Tags</Button>
+              <Button variant="outline" size="sm" onClick={() => {
+                setIsEditingTags(false);
+                setTags(question.tags);
+              }}>Cancel</Button>
+            </div>
+          </div>
+        )}
       </motion.div>
 
       {questionAnswerPairs.map((pair, index) => (
@@ -153,9 +276,22 @@ const QuestionDetail = ({ question, comments, onAddComment, onVote }: QuestionDe
           </div>
 
           <div>
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Answer</h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Answer</h2>
+              {user && editingAnswerIndex !== index && (
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => handleEditAnswer(index)}
+                  className="flex items-center space-x-1"
+                >
+                  <Edit className="h-4 w-4 mr-1" />
+                  Edit Answer
+                </Button>
+              )}
+            </div>
             
-            {isEditing && index === 0 ? (
+            {editingAnswerIndex === index ? (
               <div className="mt-4">
                 <Textarea 
                   value={editedAnswer}
@@ -165,7 +301,7 @@ const QuestionDetail = ({ question, comments, onAddComment, onVote }: QuestionDe
                 />
                 <div className="mt-4 flex space-x-2">
                   <Button onClick={handleSaveEdit}>Save Changes</Button>
-                  <Button variant="outline" onClick={() => setIsEditing(false)}>Cancel</Button>
+                  <Button variant="outline" onClick={handleCancelEdit}>Cancel</Button>
                 </div>
               </div>
             ) : (
@@ -204,15 +340,6 @@ const QuestionDetail = ({ question, comments, onAddComment, onVote }: QuestionDe
           </div>
           
           <div className="flex items-center space-x-2">
-            {user && (
-              <button 
-                onClick={() => setIsEditing(true)}
-                className="flex items-center space-x-1 p-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800"
-              >
-                <Edit className="h-5 w-5" />
-                <span className="hidden sm:inline">Edit</span>
-              </button>
-            )}
             <button 
               onClick={handleShare}
               className="flex items-center space-x-1 p-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800"

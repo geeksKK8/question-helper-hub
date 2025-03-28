@@ -3,9 +3,10 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
-import { Upload, FileText, Check } from 'lucide-react';
+import { Upload, FileText, Check, Tag, X, PlusCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { Input } from '@/components/ui/input';
 
 interface ChatMessage {
   message_id: number;
@@ -25,11 +26,39 @@ const JsonUploader = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [parsedData, setParsedData] = useState<ParsedJson | null>(null);
+  const [tags, setTags] = useState<string[]>([]);
+  const [tagInput, setTagInput] = useState('');
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       setSelectedFile(e.target.files[0]);
       setParsedData(null);
+      setTags([]);
+    }
+  };
+
+  const handleAddTag = () => {
+    if (!tagInput.trim()) return;
+    if (tags.includes(tagInput.trim())) {
+      toast.error('Tag already exists');
+      return;
+    }
+    if (tags.length >= 5) {
+      toast.error('Maximum 5 tags allowed');
+      return;
+    }
+    setTags([...tags, tagInput.trim()]);
+    setTagInput('');
+  };
+
+  const handleRemoveTag = (tagToRemove: string) => {
+    setTags(tags.filter((tag) => tag !== tagToRemove));
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleAddTag();
     }
   };
 
@@ -91,13 +120,15 @@ const JsonUploader = () => {
       return;
     }
 
+    if (tags.length === 0) {
+      toast.error('Please add at least one tag');
+      return;
+    }
+
     try {
       setIsUploading(true);
       
-      // Default tags based on content
-      const defaultTags = ['imported', 'json'];
-      
-      // Submit to Supabase
+      // Submit to Supabase - using custom tags instead of default ones
       const { data, error } = await supabase
         .from('questions')
         .insert([
@@ -105,7 +136,7 @@ const JsonUploader = () => {
             title: parsedData.title,
             content: parsedData.userQuestions,
             answer: parsedData.aiAnswers,
-            tags: defaultTags,
+            tags: tags,
             author_id: user.id
           }
         ])
@@ -118,6 +149,7 @@ const JsonUploader = () => {
       // Reset state
       setSelectedFile(null);
       setParsedData(null);
+      setTags([]);
       
       // Navigate to the newly created question
       setTimeout(() => {
@@ -185,11 +217,52 @@ const JsonUploader = () => {
                 <p><span className="font-semibold">Answers:</span> {parsedData.aiAnswers.length}</p>
               </div>
             </div>
+
+            <div>
+              <label htmlFor="tags" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Tags (max 5)
+              </label>
+              <div className="flex items-center space-x-2">
+                <Input
+                  id="tags"
+                  placeholder="Add tags..."
+                  value={tagInput}
+                  onChange={(e) => setTagInput(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  className="flex-1"
+                />
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={handleAddTag}
+                  size="icon"
+                >
+                  <PlusCircle className="h-5 w-5" />
+                </Button>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {tags.map((tag) => (
+                  <div 
+                    key={tag} 
+                    className="flex items-center bg-gray-100 text-gray-800 rounded-full px-3 py-1 text-sm dark:bg-gray-700 dark:text-gray-200"
+                  >
+                    <span>{tag}</span>
+                    <button 
+                      type="button" 
+                      onClick={() => handleRemoveTag(tag)}
+                      className="ml-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
             
             <Button 
               onClick={handleSubmit} 
               className="w-full"
-              disabled={isUploading}
+              disabled={isUploading || tags.length === 0}
             >
               <Check className="mr-2 h-5 w-5" />
               {isUploading ? 'Submitting...' : 'Submit Question'}

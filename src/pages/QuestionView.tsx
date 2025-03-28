@@ -145,6 +145,75 @@ const QuestionView = () => {
       toast.error('An unexpected error occurred');
     }
   };
+
+  // Function to update tags
+  const handleUpdateTags = async (newTags: string[]) => {
+    if (!user || !question) {
+      toast.error('You must be logged in to update tags');
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('questions')
+        .update({ tags: newTags })
+        .eq('id', question.id);
+
+      if (error) {
+        console.error('Error updating tags:', error);
+        toast.error('Failed to update tags');
+        return;
+      }
+
+      // Update local state
+      setQuestion({
+        ...question,
+        tags: newTags
+      });
+
+      toast.success('Tags updated successfully');
+    } catch (err) {
+      console.error('Error updating tags:', err);
+      toast.error('An unexpected error occurred');
+    }
+  };
+
+  // Function to update a specific answer
+  const handleUpdateAnswer = async (answerIndex: number, newContent: string) => {
+    if (!user || !question) {
+      toast.error('You must be logged in to update answers');
+      return;
+    }
+
+    try {
+      // Create a copy of the current answers array
+      const updatedAnswers = [...question.answer];
+      // Update the specific answer
+      updatedAnswers[answerIndex] = newContent;
+
+      const { error } = await supabase
+        .from('questions')
+        .update({ answer: updatedAnswers })
+        .eq('id', question.id);
+
+      if (error) {
+        console.error('Error updating answer:', error);
+        toast.error('Failed to update answer');
+        return;
+      }
+
+      // Update local state
+      setQuestion({
+        ...question,
+        answer: updatedAnswers
+      });
+
+      toast.success('Answer updated successfully');
+    } catch (err) {
+      console.error('Error updating answer:', err);
+      toast.error('An unexpected error occurred');
+    }
+  };
   
   if (loading) {
     return (
@@ -196,6 +265,8 @@ const QuestionView = () => {
         comments={comments} 
         onAddComment={handleAddComment}
         onVote={handleVote}
+        onUpdateTags={handleUpdateTags}
+        onUpdateAnswer={handleUpdateAnswer}
       />
     </div>
   );
