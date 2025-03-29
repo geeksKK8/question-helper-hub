@@ -81,8 +81,8 @@ export type Database = {
           tags: string[]
           title: string
           updated_at: string
-          votes: number
           url: string | null
+          votes: number
         }
         Insert: {
           answer: string[]
@@ -93,8 +93,8 @@ export type Database = {
           tags?: string[]
           title: string
           updated_at?: string
-          votes?: number
           url?: string | null
+          votes?: number
         }
         Update: {
           answer?: string[]
@@ -105,8 +105,8 @@ export type Database = {
           tags?: string[]
           title?: string
           updated_at?: string
-          votes?: number
           url?: string | null
+          votes?: number
         }
         Relationships: []
       }

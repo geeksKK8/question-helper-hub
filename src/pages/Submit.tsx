@@ -5,6 +5,111 @@ import JsonUploader from '@/components/questions/JsonUploader';
 import useRequireAuth from '@/hooks/useRequireAuth';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+import { DeepSeekData } from '@/lib/types';
+
+// Handle API request for direct upload
+const handleApiUpload = async (req: Request) => {
+  // Check API key format in URL
+  const url = new URL(req.url);
+  const apiKey = url.searchParams.get('key');
+  
+  if (!apiKey || !apiKey.startsWith('key_')) {
+    return new Response(JSON.stringify({ error: 'Invalid API key' }), { 
+      status: 401,
+      headers: { 'Content-Type': 'application/json' } 
+    });
+  }
+  
+  try {
+    // Get JSON data from request
+    const jsonData: DeepSeekData = await req.json();
+    
+    // Validate session and get user
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      return new Response(JSON.stringify({ error: 'Authentication required' }), { 
+        status: 401,
+        headers: { 'Content-Type': 'application/json' } 
+      });
+    }
+    
+    const user = session.user;
+    
+    // Process DeepSeek data
+    const chatSession = jsonData?.data?.biz_data?.chat_session;
+    const chatMessages = jsonData?.data?.biz_data?.chat_messages;
+
+    if (!chatSession || !chatMessages || !Array.isArray(chatMessages)) {
+      return new Response(JSON.stringify({ error: 'Invalid data format' }), { 
+        status: 400,
+        headers: { 'Content-Type': 'application/json' } 
+      });
+    }
+
+    const title = chatSession.title || 'Untitled Conversation';
+    const url = jsonData?.url;
+    
+    // Extract user questions and AI answers
+    const userQuestions: string[] = [];
+    const aiAnswers: string[] = [];
+    
+    chatMessages.forEach((message: any) => {
+      if (message.role === 'USER' && message.content) {
+        userQuestions.push(message.content);
+      } else if (message.role === 'ASSISTANT' && message.content) {
+        aiAnswers.push(message.content);
+      }
+    });
+
+    if (userQuestions.length === 0) {
+      return new Response(JSON.stringify({ error: 'No user questions found in the data' }), { 
+        status: 400,
+        headers: { 'Content-Type': 'application/json' } 
+      });
+    }
+
+    // Use AI-related tags by default for direct submissions
+    const defaultTags = ["deepseek", "ai-conversation"];
+    
+    // Submit to Supabase
+    const { data, error } = await supabase
+      .from('questions')
+      .insert([
+        {
+          title,
+          content: userQuestions,
+          answer: aiAnswers,
+          tags: defaultTags,
+          author_id: user.id,
+          url
+        }
+      ])
+      .select();
+    
+    if (error) throw error;
+    
+    return new Response(JSON.stringify({ 
+      success: true, 
+      message: 'Question submitted successfully',
+      questionId: data && data[0] ? data[0].id : null
+    }), { 
+      status: 200,
+      headers: { 'Content-Type': 'application/json' } 
+    });
+  
+  } catch (error: any) {
+    console.error('API submission error:', error);
+    return new Response(JSON.stringify({ 
+      error: `Error submitting question: ${error.message}` 
+    }), { 
+      status: 500,
+      headers: { 'Content-Type': 'application/json' } 
+    });
+  }
+};
 
 const Submit = () => {
   const navigate = useNavigate();
@@ -19,6 +124,29 @@ const Submit = () => {
       setAuthChecked(true);
     }
   }, [isLoading]);
+
+  // Setup API endpoint for direct uploads
+  useEffect(() => {
+    // Create an API endpoint for direct uploads
+    const apiHandler = async (event: any) => {
+      // Check if it's an API request to /api/upload
+      if (event.request.url.includes('/api/upload')) {
+        return await handleApiUpload(event.request);
+      }
+    };
+
+    // Add event listener for fetch requests
+    if (typeof window !== 'undefined') {
+      window.addEventListener('fetch', apiHandler);
+    }
+
+    // Cleanup
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('fetch', apiHandler);
+      }
+    };
+  }, []);
 
   // Don't render anything until we've checked auth status
   if (!authChecked) {
