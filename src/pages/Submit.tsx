@@ -16,8 +16,8 @@ const handleApiUpload = async (req: Request) => {
     console.log("API upload request received");
     
     // Check API key format in URL
-    const url = new URL(req.url);
-    const apiKey = url.searchParams.get('key');
+    const requestUrl = new URL(req.url);
+    const apiKey = requestUrl.searchParams.get('key');
     
     if (!apiKey || !apiKey.startsWith('key_')) {
       console.error("Invalid API key format");
@@ -79,7 +79,7 @@ const handleApiUpload = async (req: Request) => {
     }
 
     const title = chatSession.title || 'Untitled Conversation';
-    const url = jsonData?.url;
+    const sourceUrl = jsonData?.url;
     
     // Extract user questions and AI answers
     const userQuestions: string[] = [];
@@ -111,16 +111,14 @@ const handleApiUpload = async (req: Request) => {
     // Submit to Supabase
     const { data, error } = await supabase
       .from('questions')
-      .insert([
-        {
-          title,
-          content: userQuestions,
-          answer: aiAnswers,
-          tags: defaultTags,
-          author_id: user.id,
-          url
-        }
-      ])
+      .insert({
+        title,
+        content: userQuestions,
+        answer: aiAnswers,
+        tags: defaultTags,
+        author_id: user.id,
+        url: typeof sourceUrl === 'string' ? sourceUrl : null
+      })
       .select();
     
     if (error) {
@@ -154,15 +152,6 @@ const handleApiUpload = async (req: Request) => {
     });
   }
 };
-
-// Custom event listener for API calls
-class APIHandler extends EventTarget {
-  handleEvent(event: Event) {
-    if (event instanceof FetchEvent && event.request.url.includes('/api/upload')) {
-      event.respondWith(handleApiUpload(event.request));
-    }
-  }
-}
 
 const Submit = () => {
   const navigate = useNavigate();
