@@ -239,14 +239,32 @@
                 .then(response => {
                     log.info(`接收到响应，状态: ${response.status}`);
                     
-                    if (!response.ok) {
+                    // Try to ensure we get JSON or handle errors appropriately
+                    const contentType = response.headers.get('Content-Type') || '';
+                    if (contentType.includes('application/json')) {
+                        return response.json().then(data => {
+                            if (!response.ok) {
+                                throw new Error(data.error || `Server error: ${response.status}`);
+                            }
+                            return data;
+                        });
+                    } else {
+                        // Not JSON - try to get the text to see what it is
                         return response.text().then(text => {
-                            log.error(`服务器响应错误: ${response.status}`, text);
-                            throw new Error(`服务器错误 ${response.status}: ${text.substring(0, 100)}`);
+                            if (!response.ok) {
+                                // For non-OK responses that aren't JSON, create a reasonable error
+                                throw new Error(`Server returned non-JSON response: ${text.substring(0, 50)}...`);
+                            }
+                            
+                            // For OK responses that aren't JSON, try to parse as JSON anyway
+                            // (in case Content-Type is wrong but content is actually JSON)
+                            try {
+                                return JSON.parse(text);
+                            } catch (e) {
+                                throw new Error(`Server returned non-JSON response: ${text.substring(0, 50)}...`);
+                            }
                         });
                     }
-                    
-                    return response.json();
                 })
                 .then(data => {
                     if (data.error) {

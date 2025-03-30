@@ -19,34 +19,45 @@ const handleApiUpload = async (req: Request) => {
     const requestUrl = new URL(req.url);
     const apiKey = requestUrl.searchParams.get('key');
     
-    if (!apiKey || !apiKey.startsWith('key_')) {
-      console.error("Invalid API key format");
-      return new Response(JSON.stringify({ error: 'Invalid API key' }), { 
-        status: 401,
-        headers: { 
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'POST, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type'
-        } 
-      });
-    }
+    // Define CORS headers once to reuse
+    const corsHeaders = {
+      'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+    };
     
-    // Handle CORS preflight request
+    // Handle CORS preflight request first
     if (req.method === 'OPTIONS') {
+      console.log("Handling OPTIONS preflight request");
       return new Response(null, {
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'POST, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type',
-        },
+        headers: corsHeaders,
         status: 204,
       });
     }
     
+    if (!apiKey || !apiKey.startsWith('key_')) {
+      console.error("Invalid API key format");
+      return new Response(JSON.stringify({ error: 'Invalid API key' }), { 
+        status: 401,
+        headers: corsHeaders 
+      });
+    }
+    
     // Get JSON data from request
-    const jsonData: DeepSeekData = await req.json();
-    console.log("Request data received and parsed");
+    let jsonData: DeepSeekData;
+    try {
+      jsonData = await req.json();
+      console.log("Request data received and parsed");
+    } catch (parseError: any) {
+      console.error("JSON parse error:", parseError.message);
+      return new Response(JSON.stringify({ 
+        error: `Invalid JSON: ${parseError.message}` 
+      }), { 
+        status: 400,
+        headers: corsHeaders 
+      });
+    }
     
     // Validate session and get user
     const { data: { session } } = await supabase.auth.getSession();
@@ -54,10 +65,7 @@ const handleApiUpload = async (req: Request) => {
       console.error("No authenticated session found");
       return new Response(JSON.stringify({ error: 'Authentication required' }), { 
         status: 401,
-        headers: { 
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*'
-        } 
+        headers: corsHeaders 
       });
     }
     
@@ -71,10 +79,7 @@ const handleApiUpload = async (req: Request) => {
       console.error("Invalid data format received");
       return new Response(JSON.stringify({ error: 'Invalid data format' }), { 
         status: 400,
-        headers: { 
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*'
-        } 
+        headers: corsHeaders 
       });
     }
 
@@ -97,10 +102,7 @@ const handleApiUpload = async (req: Request) => {
       console.error("No user questions found in data");
       return new Response(JSON.stringify({ error: 'No user questions found in the data' }), { 
         status: 400,
-        headers: { 
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*'
-        } 
+        headers: corsHeaders 
       });
     }
 
@@ -133,10 +135,7 @@ const handleApiUpload = async (req: Request) => {
       questionId: data && data[0] ? data[0].id : null
     }), { 
       status: 200,
-      headers: { 
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*'
-      } 
+      headers: corsHeaders 
     });
   
   } catch (error: any) {
@@ -147,7 +146,9 @@ const handleApiUpload = async (req: Request) => {
       status: 500,
       headers: { 
         'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*'
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization'
       } 
     });
   }
@@ -169,17 +170,42 @@ const Submit = () => {
 
   // Set up API route handler
   useEffect(() => {
-    // Create a proper API route handler with fetch event
     if (typeof window !== 'undefined') {
       // Create a route handler for /api/upload
       const apiRoute = '/api/upload';
-      
-      // Override fetch for our specific API route
       const originalFetch = window.fetch;
+      
       window.fetch = function(input, init) {
         if (typeof input === 'string' && input.includes(apiRoute)) {
-          return handleApiUpload(new Request(input, init))
-            .then(response => Promise.resolve(response));
+          console.log(`API route matched: ${input}`);
+          try {
+            return handleApiUpload(new Request(input, init))
+              .then(response => {
+                console.log(`API response status: ${response.status}`);
+                return response;
+              })
+              .catch(err => {
+                console.error(`API handler error: ${err.message}`);
+                // Return a proper Response object instead of throwing
+                return new Response(JSON.stringify({ error: err.message }), {
+                  status: 500,
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Access-Control-Allow-Origin': '*'
+                  }
+                });
+              });
+          } catch (error: any) {
+            console.error(`API route catch: ${error.message}`);
+            // Return a proper Response object instead of throwing
+            return Promise.resolve(new Response(JSON.stringify({ error: error.message }), {
+              status: 500,
+              headers: {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*'
+              }
+            }));
+          }
         }
         return originalFetch.apply(this, [input, init]);
       };
