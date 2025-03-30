@@ -1,4 +1,3 @@
-
 // ==UserScript==
 // @name         DeepSeek Direct Uploader
 // @namespace    https://chat.deepseek.com/
@@ -25,7 +24,7 @@
     };
 
     const targetUrlPattern = /chat_session_id=/;
-    const apiUrl = "{REPLACE_WITH_ACTUAL_API_URL}";
+    const apiUrl = "https://question-helper-hub.lovable.app/api/upload";
 
     function processTargetResponse(text, url) {
         try {
