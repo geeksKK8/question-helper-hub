@@ -30,9 +30,6 @@ const JsonUploader = () => {
   const [parsedData, setParsedData] = useState<ParsedJson | null>(null);
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
-  // Generate a unique API key for this session
-  const [apiKey] = useState<string>(`key_${Math.random().toString(36).substring(2, 15)}`);
-  const [showApiKey, setShowApiKey] = useState(false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -137,16 +134,14 @@ const JsonUploader = () => {
       // Submit to Supabase - using custom tags instead of default ones
       const { data, error } = await supabase
         .from('questions')
-        .insert([
-          {
-            title: parsedData.title,
-            content: parsedData.userQuestions,
-            answer: parsedData.aiAnswers,
-            tags: tags,
-            author_id: user.id,
-            url: parsedData.url
-          }
-        ])
+        .insert({
+          title: parsedData.title,
+          content: parsedData.userQuestions,
+          answer: parsedData.aiAnswers,
+          tags: tags,
+          author_id: user.id,
+          url: parsedData.url
+        })
         .select();
       
       if (error) throw error;
@@ -174,84 +169,9 @@ const JsonUploader = () => {
     }
   };
 
-  // Function to handle direct API submission from DeepSeek
-  const handleApiSubmit = async (deepSeekData: DeepSeekData) => {
-    try {
-      // Validate we have a user
-      if (!user) {
-        return { error: 'Authentication required' };
-      }
-
-      const chatSession = deepSeekData?.data?.biz_data?.chat_session;
-      const chatMessages = deepSeekData?.data?.biz_data?.chat_messages;
-
-      if (!chatSession || !chatMessages || !Array.isArray(chatMessages)) {
-        return { error: 'Invalid data format' };
-      }
-
-      const title = chatSession.title || 'Untitled Conversation';
-      const url = deepSeekData?.url;
-      
-      // Extract user questions and AI answers
-      const userQuestions: string[] = [];
-      const aiAnswers: string[] = [];
-      
-      chatMessages.forEach((message: ChatMessage) => {
-        if (message.role === 'USER' && message.content) {
-          userQuestions.push(message.content);
-        } else if (message.role === 'ASSISTANT' && message.content) {
-          aiAnswers.push(message.content);
-        }
-      });
-
-      if (userQuestions.length === 0) {
-        return { error: 'No user questions found in the data' };
-      }
-
-      // Use AI-related tags by default for direct submissions
-      const defaultTags = ["deepseek", "ai-conversation"];
-      
-      // Submit to Supabase
-      const { data, error } = await supabase
-        .from('questions')
-        .insert([
-          {
-            title,
-            content: userQuestions,
-            answer: aiAnswers,
-            tags: defaultTags,
-            author_id: user.id,
-            url
-          }
-        ])
-        .select();
-      
-      if (error) throw error;
-      
-      return { 
-        success: true, 
-        message: 'Question submitted successfully',
-        questionId: data && data[0] ? data[0].id : null
-      };
-    } catch (error: any) {
-      console.error('API submission error:', error);
-      return { 
-        error: `Error submitting question: ${error.message}` 
-      };
-    }
-  };
-
-  // Define the API endpoint for the Tampermonkey script
-  const getApiUrl = () => {
-    const baseUrl = window.location.origin;
-    return `${baseUrl}/api/upload?key=${apiKey}`;
-  };
-
-  // Generate the Tampermonkey script with the API endpoint
+  // Generate the Tampermonkey script with updated content
   const generateTampermonkeyScript = () => {
-    const apiUrl = getApiUrl();
-    return `
-// ==UserScript==
+    return `// ==UserScript==
 // @name         DeepSeek Direct Uploader
 // @namespace    https://chat.deepseek.com/
 // @version      1.0
@@ -265,20 +185,119 @@ const JsonUploader = () => {
 (function() {
     'use strict';
 
+    // Configuration
+    const SUPABASE_URL = "https://ejoiyuobalmjfvgzsclq.supabase.co";
+    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVqb2l5dW9iYWxtamZ2Z3pzY2xxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI4MjExODAsImV4cCI6MjA1ODM5NzE4MH0.nGz3SO8Gtvnj7o5VDkF6J5MrGKnZ3K2JLCjs8n8-ie8";
+    
+    // Authentication - Set these variables for authentication
+    // Either set default values here or leave empty and prompt the user
+    let userEmail = '';
+    let userPassword = '';
+
+    // State management
     let state = {
         targetResponse: null,
         lastUpdateTime: null,
-        convertedMd: null
+        convertedMd: null,
+        isAuthenticated: false,
+        session: null
     };
 
+    // Basic logging utility
     const log = {
         info: (msg) => console.log(\`[DeepSeek Uploader] \${msg}\`),
         error: (msg, e) => console.error(\`[DeepSeek Uploader] \${msg}\`, e)
     };
 
+    // Pattern to identify the chat session
     const targetUrlPattern = /chat_session_id=/;
-    const apiUrl = "${apiUrl}";
 
+    // Simple Supabase client implementation
+    const supabase = {
+        auth: {
+            signIn: async (email, password) => {
+                try {
+                    const response = await fetch(\`\${SUPABASE_URL}/auth/v1/token?grant_type=password\`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'apikey': SUPABASE_KEY,
+                        },
+                        body: JSON.stringify({ email, password })
+                    });
+                    
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.error_description || 'Sign in failed');
+                    }
+                    
+                    const data = await response.json();
+                    return { 
+                        data: { 
+                            session: {
+                                access_token: data.access_token,
+                                refresh_token: data.refresh_token,
+                                user: data.user
+                            }
+                        }, 
+                        error: null 
+                    };
+                } catch (error) {
+                    return { data: null, error };
+                }
+            },
+            getSession: () => {
+                // Check localStorage for session
+                try {
+                    const storedSession = localStorage.getItem('supabase.auth.token');
+                    if (storedSession) {
+                        const session = JSON.parse(storedSession);
+                        return { data: { session }, error: null };
+                    }
+                } catch (e) {
+                    log.error('Error retrieving session', e);
+                }
+                return { data: { session: null }, error: null };
+            }
+        },
+        from: (table) => {
+            return {
+                insert: async (records) => {
+                    try {
+                        // Get the current session
+                        const { data: { session } } = state.session ? { data: { session: state.session } } : supabase.auth.getSession();
+                        
+                        if (!session) {
+                            return { data: null, error: new Error('Authentication required') };
+                        }
+                        
+                        const response = await fetch(\`\${SUPABASE_URL}/rest/v1/\${table}\`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'apikey': SUPABASE_KEY,
+                                'Authorization': \`Bearer \${session.access_token}\`,
+                                'Prefer': 'return=representation'
+                            },
+                            body: JSON.stringify(records)
+                        });
+                        
+                        if (!response.ok) {
+                            const errorData = await response.json();
+                            throw new Error(errorData.message || \`Failed to insert into \${table}\`);
+                        }
+                        
+                        const data = await response.json();
+                        return { data, error: null };
+                    } catch (error) {
+                        return { data: null, error };
+                    }
+                }
+            };
+        }
+    };
+
+    // Process and store the target response
     function processTargetResponse(text, url) {
         try {
             if (targetUrlPattern.test(url)) {
@@ -287,7 +306,6 @@ const JsonUploader = () => {
                 updateButtonStatus();
                 log.info(\`成功捕获目标响应 (\${text.length} bytes) 来自: \${url}\`);
 
-                // Convert to markdown for download option
                 state.convertedMd = convertJsonToMd(JSON.parse(text));
                 log.info('成功将JSON转换为Markdown');
             }
@@ -296,29 +314,43 @@ const JsonUploader = () => {
         }
     }
 
+    // Update the button status based on current state
     function updateButtonStatus() {
         const jsonButton = document.getElementById('downloadJsonButton');
         const mdButton = document.getElementById('downloadMdButton');
         const uploadButton = document.getElementById('uploadButton');
+        const loginButton = document.getElementById('loginButton');
         
-        if (jsonButton && mdButton && uploadButton) {
+        if (jsonButton && mdButton && uploadButton && loginButton) {
             const hasResponse = state.targetResponse !== null;
             jsonButton.style.backgroundColor = hasResponse ? '#28a745' : '#007bff';
             mdButton.style.backgroundColor = state.convertedMd ? '#28a745' : '#007bff';
             uploadButton.style.backgroundColor = hasResponse ? '#ff7f00' : '#007bff';
+            loginButton.style.backgroundColor = state.isAuthenticated ? '#28a745' : '#dc3545';
             
-            const statusText = hasResponse ? \`最后更新: \${state.lastUpdateTime}\\n数据已准备好\` : '等待目标响应中...';
+            const statusText = hasResponse 
+                ? \`最后更新: \${state.lastUpdateTime}\\n数据已准备好\` 
+                : '等待目标响应中...';
+            
+            const loginStatus = state.isAuthenticated 
+                ? '已登录' 
+                : '未登录 - 点击登录';
+            
             jsonButton.title = statusText;
             mdButton.title = statusText;
             uploadButton.title = statusText;
+            loginButton.title = loginStatus;
+            loginButton.innerText = state.isAuthenticated ? '已登录' : '登录';
         }
     }
 
+    // Create UI elements for interaction
     function createDownloadButtons() {
         const buttonContainer = document.createElement('div');
         const jsonButton = document.createElement('button');
         const mdButton = document.createElement('button');
         const uploadButton = document.createElement('button');
+        const loginButton = document.createElement('button');
 
         Object.assign(buttonContainer.style, {
             position: 'fixed',
@@ -353,10 +385,13 @@ const JsonUploader = () => {
         mdButton.innerText = 'MD';
         uploadButton.id = 'uploadButton';
         uploadButton.innerText = '上传';
+        loginButton.id = 'loginButton';
+        loginButton.innerText = '登录';
 
         Object.assign(jsonButton.style, buttonStyles);
         Object.assign(mdButton.style, buttonStyles);
         Object.assign(uploadButton.style, { ...buttonStyles, backgroundColor: '#ff7f00' });
+        Object.assign(loginButton.style, { ...buttonStyles, backgroundColor: '#dc3545' });
 
         buttonContainer.onmouseenter = () => buttonContainer.style.opacity = '1';
         buttonContainer.onmouseleave = () => buttonContainer.style.opacity = '0.7';
@@ -400,6 +435,65 @@ const JsonUploader = () => {
         function setTranslate(xPos, yPos, el) {
             el.style.transform = \`translate(\${xPos}px, \${yPos}px)\`;
         }
+
+        // Login button functionality
+        loginButton.onclick = async function() {
+            try {
+                if (state.isAuthenticated) {
+                    // Show currently logged in status
+                    alert('您已登录。如需重新登录，请刷新页面。');
+                    return;
+                }
+                
+                // Check if we have stored credentials first
+                const email = userEmail || localStorage.getItem('deepseek_uploader_email') || prompt('请输入您的电子邮件地址:');
+                if (!email) return;
+                
+                const password = userPassword || localStorage.getItem('deepseek_uploader_password') || prompt('请输入您的密码:');
+                if (!password) return;
+                
+                // Show login in progress
+                loginButton.innerText = '登录中...';
+                loginButton.disabled = true;
+                
+                // Try to sign in
+                const { data, error } = await supabase.auth.signIn(email, password);
+                
+                if (error) {
+                    alert(\`登录失败: \${error.message}\`);
+                    loginButton.innerText = '登录';
+                    loginButton.disabled = false;
+                    loginButton.style.backgroundColor = '#dc3545';
+                    return;
+                }
+                
+                // Store session and update state
+                state.session = data.session;
+                state.isAuthenticated = true;
+                
+                // Save credentials if user wants to
+                if (confirm('是否保存登录凭据？（仅保存在本地浏览器中）')) {
+                    localStorage.setItem('deepseek_uploader_email', email);
+                    localStorage.setItem('deepseek_uploader_password', password);
+                }
+                
+                // Store session in localStorage
+                localStorage.setItem('supabase.auth.token', JSON.stringify(data.session));
+                
+                // Update UI
+                loginButton.innerText = '已登录';
+                loginButton.style.backgroundColor = '#28a745';
+                updateButtonStatus();
+                
+                alert('登录成功！');
+            } catch (e) {
+                log.error('登录过程中出错:', e);
+                alert(\`登录过程中出错: \${e.message}\`);
+                loginButton.innerText = '登录';
+                loginButton.disabled = false;
+                loginButton.style.backgroundColor = '#dc3545';
+            }
+        };
 
         // JSON download button
         jsonButton.onclick = function() {
@@ -455,118 +549,173 @@ const JsonUploader = () => {
             }
         };
 
-        // Direct upload button
-        uploadButton.onclick = function() {
+        // Direct upload to Supabase button
+        uploadButton.onclick = async function() {
             if (!state.targetResponse) {
                 alert('还没有发现有效的对话记录。\\n请等待目标响应或进行一些对话。');
                 return;
             }
+            
+            // Check authentication
+            if (!state.isAuthenticated) {
+                const shouldLogin = confirm('您尚未登录。需要先登录才能上传内容。是否现在登录？');
+                if (shouldLogin) {
+                    loginButton.click();
+                }
+                return;
+            }
+            
             try {
                 const originalData = JSON.parse(state.targetResponse);
-                const enhancedData = {
-                    ...originalData,
-                    url: window.location.href,    
-                };
+                const sourceUrl = window.location.href;
+                
+                // Extract data from the DeepSeek response
+                const chatSession = originalData.data.biz_data.chat_session;
+                const chatMessages = originalData.data.biz_data.chat_messages;
+                
+                if (!chatSession || !chatMessages || !Array.isArray(chatMessages)) {
+                    alert('数据格式无效：无法找到对话信息。');
+                    return;
+                }
+                
+                const title = chatSession.title || 'Untitled Conversation';
+                
+                // Extract user questions and AI answers
+                const userQuestions = [];
+                const aiAnswers = [];
+                
+                chatMessages.forEach(message => {
+                    if (message.role === 'USER' && message.content) {
+                        userQuestions.push(message.content);
+                    } else if (message.role === 'ASSISTANT' && message.content) {
+                        aiAnswers.push(message.content);
+                    }
+                });
+                
+                if (userQuestions.length === 0) {
+                    alert('未在数据中找到用户问题。');
+                    return;
+                }
+                
+                // Default tags
+                const defaultTags = ["deepseek", "ai-conversation"];
                 
                 // Show upload status
                 uploadButton.innerText = '上传中...';
                 uploadButton.disabled = true;
                 uploadButton.style.backgroundColor = '#cccccc';
                 
-                // Send to API
-                fetch(apiUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(enhancedData)
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.error) {
-                        throw new Error(data.error);
-                    }
-                    
-                    // Handle successful upload
-                    log.info('上传成功!', data);
-                    uploadButton.innerText = '✓ 已上传';
-                    uploadButton.style.backgroundColor = '#28a745';
-                    
-                    // If we have a question ID, provide a link
-                    if (data.questionId) {
-                        const urlParts = apiUrl.split('/api/');
-                        if (urlParts.length > 1) {
-                            const baseUrl = urlParts[0];
-                            const viewUrl = \`\${baseUrl}/question/\${data.questionId}\`;
-                            
-                            // Show a notification with link
-                            const notification = document.createElement('div');
-                            Object.assign(notification.style, {
-                                position: 'fixed',
-                                bottom: '20px',
-                                right: '20px',
-                                backgroundColor: 'white',
-                                color: 'black',
-                                padding: '15px',
-                                borderRadius: '5px',
-                                boxShadow: '0 0 10px rgba(0,0,0,0.2)',
-                                zIndex: '10000',
-                                maxWidth: '300px'
-                            });
-                            
-                            notification.innerHTML = \`
-                            <div style="font-weight:bold;margin-bottom:10px;">上传成功!</div>
-                            <p>对话已成功上传。</p>
-                            <a href="\${viewUrl}" target="_blank" style="display:block;text-align:center;background:#007bff;color:white;padding:8px;border-radius:4px;margin-top:10px;text-decoration:none;">查看对话</a>
-                            \`;
-                            
-                            document.body.appendChild(notification);
-                            
-                            // Remove notification after 10 seconds
-                            setTimeout(() => {
-                                if (document.body.contains(notification)) {
-                                    document.body.removeChild(notification);
-                                }
-                            }, 10000);
-                        }
-                    }
-                    
-                    // Reset button after 3 seconds
-                    setTimeout(() => {
-                        uploadButton.innerText = '上传';
-                        uploadButton.disabled = false;
-                        uploadButton.style.backgroundColor = '#ff7f00';
-                    }, 3000);
-                })
-                .catch(error => {
-                    log.error('上传过程中出错:', error);
-                    alert(\`上传失败: \${error.message}\`);
-                    
-                    // Reset button
-                    uploadButton.innerText = '重试上传';
-                    uploadButton.disabled = false;
-                    uploadButton.style.backgroundColor = '#dc3545';
+                // Submit to Supabase directly
+                log.info('正在提交到Supabase...');
+                
+                const { data, error } = await supabase.from('questions').insert({
+                    title,
+                    content: userQuestions,
+                    answer: aiAnswers,
+                    tags: defaultTags,
+                    author_id: state.session.user.id,
+                    url: sourceUrl
                 });
                 
-            } catch (e) {
-                log.error('上传准备过程中出错:', e);
-                alert('上传过程中发生错误，请查看控制台了解详情。');
+                if (error) {
+                    throw error;
+                }
+                
+                log.info('问题成功提交！', data);
+                uploadButton.innerText = '✓ 已上传';
+                uploadButton.style.backgroundColor = '#28a745';
+                
+                // Display success notification
+                const notification = document.createElement('div');
+                Object.assign(notification.style, {
+                    position: 'fixed',
+                    bottom: '20px',
+                    right: '20px',
+                    backgroundColor: 'white',
+                    color: 'black',
+                    padding: '15px',
+                    borderRadius: '5px',
+                    boxShadow: '0 0 10px rgba(0,0,0,0.2)',
+                    zIndex: '10000',
+                    maxWidth: '300px'
+                });
+                
+                notification.innerHTML = \`
+                <div style="font-weight:bold;margin-bottom:10px;">上传成功!</div>
+                <p>对话已成功上传。</p>
+                \`;
+                
+                document.body.appendChild(notification);
+                
+                // Remove notification after 10 seconds
+                setTimeout(() => {
+                    if (document.body.contains(notification)) {
+                        document.body.removeChild(notification);
+                    }
+                }, 10000);
+                
+                // Reset button after 3 seconds
+                setTimeout(() => {
+                    uploadButton.innerText = '上传';
+                    uploadButton.disabled = false;
+                    uploadButton.style.backgroundColor = '#ff7f00';
+                }, 3000);
+                
+            } catch (error) {
+                log.error('上传过程中出错:', error);
+                
+                // Format error message
+                let errorMessage = '上传失败';
+                if (error.message) {
+                    errorMessage += ': ' + error.message;
+                } else if (typeof error === 'object') {
+                    errorMessage += ': ' + JSON.stringify(error);
+                }
+                
+                alert(errorMessage);
                 
                 // Reset button
-                uploadButton.innerText = '上传';
+                uploadButton.innerText = '重试上传';
                 uploadButton.disabled = false;
-                uploadButton.style.backgroundColor = '#ff7f00';
+                uploadButton.style.backgroundColor = '#dc3545';
             }
         };
 
+        buttonContainer.appendChild(loginButton);
         buttonContainer.appendChild(jsonButton);
         buttonContainer.appendChild(mdButton);
         buttonContainer.appendChild(uploadButton);
         document.body.appendChild(buttonContainer);
 
+        // Check if we're already authenticated on startup
+        checkAuthentication();
         updateButtonStatus();
     }
 
+    // Check if user is already authenticated
+    async function checkAuthentication() {
+        try {
+            const { data: { session }, error } = supabase.auth.getSession();
+            
+            if (error) {
+                log.error('检查认证状态时出错:', error);
+                return;
+            }
+            
+            if (session) {
+                state.session = session;
+                state.isAuthenticated = true;
+                updateButtonStatus();
+                log.info('已检测到现有会话，用户已登录');
+            } else {
+                log.info('无现有会话，用户未登录');
+            }
+        } catch (e) {
+            log.error('检查认证状态时发生错误:', e);
+        }
+    }
+
+    // Convert JSON to Markdown format
     function convertJsonToMd(data) {
         let mdContent = [];
         const title = data.data.biz_data.chat_session.title || 'Untitled Chat';
@@ -615,7 +764,7 @@ const JsonUploader = () => {
             }
 
             content = content.replace(/\\$\\$(.*?)\\$\\$/gs, (match, formula) => {
-                return formula.includes('\n')? \`\n$$\n\${formula}\n$$\n\` : \`$$\${formula}$$\`;
+                return formula.includes('\\n')? \`\n$$\n\${formula}\n$$\n\` : \`$$\${formula}$$\`;
             });
 
             mdContent.push(content + '\n');
@@ -624,6 +773,7 @@ const JsonUploader = () => {
         return mdContent.join('\n');
     }
 
+    // Hook into XHR to capture DeepSeek's responses
     const hookXHR = () => {
         const originalOpen = XMLHttpRequest.prototype.open;
         XMLHttpRequest.prototype.open = function(...args) {
@@ -640,11 +790,16 @@ const JsonUploader = () => {
     };
     hookXHR();
 
+    // Initialize everything when the window loads
     window.addEventListener('load', function() {
         createDownloadButtons();
 
+        // Observe DOM for changes to re-add buttons if needed
         const observer = new MutationObserver(() => {
-            if (!document.getElementById('downloadJsonButton') || !document.getElementById('downloadMdButton') || !document.getElementById('uploadButton')) {
+            if (!document.getElementById('downloadJsonButton') || 
+                !document.getElementById('downloadMdButton') || 
+                !document.getElementById('uploadButton') || 
+                !document.getElementById('loginButton')) {
                 log.info('检测到按钮丢失，正在重新创建...');
                 createDownloadButtons();
             }
@@ -658,17 +813,6 @@ const JsonUploader = () => {
         log.info('DeepSeek 上传脚本已启动');
     });
 })();`;
-  };
-
-  // Toggle display of API key
-  const toggleApiKeyDisplay = () => {
-    setShowApiKey(!showApiKey);
-  };
-
-  // Copy API key to clipboard
-  const copyApiKey = () => {
-    navigator.clipboard.writeText(apiKey);
-    toast.success('API key copied to clipboard');
   };
 
   // Copy Tampermonkey script to clipboard
@@ -780,38 +924,13 @@ const JsonUploader = () => {
           </div>
         )}
         
-        {/* Direct API Upload Section */}
+        {/* Direct Upload with DeepSeek Section - Updated without API key */}
         <div className="mt-10 pt-8 border-t border-gray-200 dark:border-gray-700">
           <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-6">
             Direct Upload with DeepSeek
           </h3>
           
           <div className="space-y-6">
-            <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
-              <div className="flex items-center justify-between mb-4">
-                <h4 className="font-medium text-gray-900 dark:text-white">Your API Key</h4>
-                <div className="space-x-2">
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={toggleApiKeyDisplay}
-                  >
-                    {showApiKey ? 'Hide' : 'Show'}
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={copyApiKey}
-                  >
-                    Copy
-                  </Button>
-                </div>
-              </div>
-              <div className="bg-white dark:bg-gray-800 p-3 rounded border border-gray-300 dark:border-gray-600 font-mono text-sm break-all">
-                {showApiKey ? apiKey : '••••••••••••••••••••••••••••••••'}
-              </div>
-            </div>
-            
             <div>
               <div className="flex items-center justify-between mb-4">
                 <h4 className="font-medium text-gray-900 dark:text-white">DeepSeek Tampermonkey Script</h4>
