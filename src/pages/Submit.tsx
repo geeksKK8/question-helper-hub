@@ -12,27 +12,52 @@ import { DeepSeekData } from '@/lib/types';
 
 // Handle API request for direct upload
 const handleApiUpload = async (req: Request) => {
-  // Check API key format in URL
-  const url = new URL(req.url);
-  const apiKey = url.searchParams.get('key');
-  
-  if (!apiKey || !apiKey.startsWith('key_')) {
-    return new Response(JSON.stringify({ error: 'Invalid API key' }), { 
-      status: 401,
-      headers: { 'Content-Type': 'application/json' } 
-    });
-  }
-  
   try {
+    console.log("API upload request received");
+    
+    // Check API key format in URL
+    const url = new URL(req.url);
+    const apiKey = url.searchParams.get('key');
+    
+    if (!apiKey || !apiKey.startsWith('key_')) {
+      console.error("Invalid API key format");
+      return new Response(JSON.stringify({ error: 'Invalid API key' }), { 
+        status: 401,
+        headers: { 
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'POST, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type'
+        } 
+      });
+    }
+    
+    // Handle CORS preflight request
+    if (req.method === 'OPTIONS') {
+      return new Response(null, {
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'POST, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type',
+        },
+        status: 204,
+      });
+    }
+    
     // Get JSON data from request
     const jsonData: DeepSeekData = await req.json();
+    console.log("Request data received and parsed");
     
     // Validate session and get user
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
+      console.error("No authenticated session found");
       return new Response(JSON.stringify({ error: 'Authentication required' }), { 
         status: 401,
-        headers: { 'Content-Type': 'application/json' } 
+        headers: { 
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        } 
       });
     }
     
@@ -43,9 +68,13 @@ const handleApiUpload = async (req: Request) => {
     const chatMessages = jsonData?.data?.biz_data?.chat_messages;
 
     if (!chatSession || !chatMessages || !Array.isArray(chatMessages)) {
+      console.error("Invalid data format received");
       return new Response(JSON.stringify({ error: 'Invalid data format' }), { 
         status: 400,
-        headers: { 'Content-Type': 'application/json' } 
+        headers: { 
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        } 
       });
     }
 
@@ -65,15 +94,20 @@ const handleApiUpload = async (req: Request) => {
     });
 
     if (userQuestions.length === 0) {
+      console.error("No user questions found in data");
       return new Response(JSON.stringify({ error: 'No user questions found in the data' }), { 
         status: 400,
-        headers: { 'Content-Type': 'application/json' } 
+        headers: { 
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        } 
       });
     }
 
     // Use AI-related tags by default for direct submissions
     const defaultTags = ["deepseek", "ai-conversation"];
     
+    console.log("Submitting to Supabase...");
     // Submit to Supabase
     const { data, error } = await supabase
       .from('questions')
@@ -89,15 +123,22 @@ const handleApiUpload = async (req: Request) => {
       ])
       .select();
     
-    if (error) throw error;
+    if (error) {
+      console.error("Supabase error:", error);
+      throw error;
+    }
     
+    console.log("Question submitted successfully");
     return new Response(JSON.stringify({ 
       success: true, 
       message: 'Question submitted successfully',
       questionId: data && data[0] ? data[0].id : null
     }), { 
       status: 200,
-      headers: { 'Content-Type': 'application/json' } 
+      headers: { 
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*'
+      } 
     });
   
   } catch (error: any) {
@@ -106,10 +147,22 @@ const handleApiUpload = async (req: Request) => {
       error: `Error submitting question: ${error.message}` 
     }), { 
       status: 500,
-      headers: { 'Content-Type': 'application/json' } 
+      headers: { 
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*'
+      } 
     });
   }
 };
+
+// Custom event listener for API calls
+class APIHandler extends EventTarget {
+  handleEvent(event: Event) {
+    if (event instanceof FetchEvent && event.request.url.includes('/api/upload')) {
+      event.respondWith(handleApiUpload(event.request));
+    }
+  }
+}
 
 const Submit = () => {
   const navigate = useNavigate();
@@ -125,27 +178,23 @@ const Submit = () => {
     }
   }, [isLoading]);
 
-  // Setup API endpoint for direct uploads
+  // Set up API route handler
   useEffect(() => {
-    // Create an API endpoint for direct uploads
-    const apiHandler = async (event: any) => {
-      // Check if it's an API request to /api/upload
-      if (event.request.url.includes('/api/upload')) {
-        return await handleApiUpload(event.request);
-      }
-    };
-
-    // Add event listener for fetch requests
+    // Create a proper API route handler with fetch event
     if (typeof window !== 'undefined') {
-      window.addEventListener('fetch', apiHandler);
+      // Create a route handler for /api/upload
+      const apiRoute = '/api/upload';
+      
+      // Override fetch for our specific API route
+      const originalFetch = window.fetch;
+      window.fetch = function(input, init) {
+        if (typeof input === 'string' && input.includes(apiRoute)) {
+          return handleApiUpload(new Request(input, init))
+            .then(response => Promise.resolve(response));
+        }
+        return originalFetch.apply(this, [input, init]);
+      };
     }
-
-    // Cleanup
-    return () => {
-      if (typeof window !== 'undefined') {
-        window.removeEventListener('fetch', apiHandler);
-      }
-    };
   }, []);
 
   // Don't render anything until we've checked auth status

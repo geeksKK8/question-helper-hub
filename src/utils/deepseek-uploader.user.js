@@ -1,3 +1,4 @@
+
 // ==UserScript==
 // @name         DeepSeek Direct Uploader
 // @namespace    https://chat.deepseek.com/
@@ -219,15 +220,34 @@
                 uploadButton.disabled = true;
                 uploadButton.style.backgroundColor = '#cccccc';
                 
-                // Send to API
-                fetch(apiUrl, {
+                // Generate a random key
+                const apiKeyParam = 'key_' + Math.random().toString(36).substring(2, 15);
+                const finalApiUrl = `${apiUrl}?key=${apiKeyParam}`;
+                
+                log.info(`正在上传到: ${finalApiUrl}`);
+                
+                // Send to API with proper CORS handling
+                fetch(finalApiUrl, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify(enhancedData)
+                    body: JSON.stringify(enhancedData),
+                    mode: 'cors',
+                    credentials: 'omit'
                 })
-                .then(response => response.json())
+                .then(response => {
+                    log.info(`接收到响应，状态: ${response.status}`);
+                    
+                    if (!response.ok) {
+                        return response.text().then(text => {
+                            log.error(`服务器响应错误: ${response.status}`, text);
+                            throw new Error(`服务器错误 ${response.status}: ${text.substring(0, 100)}`);
+                        });
+                    }
+                    
+                    return response.json();
+                })
                 .then(data => {
                     if (data.error) {
                         throw new Error(data.error);
