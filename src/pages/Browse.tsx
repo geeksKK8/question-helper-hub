@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Filter } from 'lucide-react';
+import { Filter, User } from 'lucide-react';
 import QuestionCard from '@/components/questions/QuestionCard';
 import TagBadge from '@/components/ui/TagBadge';
 import SearchBar from '@/components/ui/SearchBar';
@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Question, Tag } from '@/lib/types';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
 
 // Sorting options
 const sortOptions = [
@@ -24,6 +25,9 @@ const Browse = () => {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState('recent');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [showOnlyMine, setShowOnlyMine] = useState(false);
+  
+  const { user } = useAuth();
   
   // Fetch questions
   useEffect(() => {
@@ -88,7 +92,7 @@ const Browse = () => {
     }
   };
   
-  // Filter questions based on search term and selected tags
+  // Filter questions based on search term, selected tags, and ownership filter
   const filteredQuestions = questions.filter(question => {
     const matchesSearch = searchTerm === '' || 
       question.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -99,7 +103,9 @@ const Browse = () => {
     const matchesTags = selectedTags.length === 0 || 
       selectedTags.every(tag => question.tags.includes(tag));
     
-    return matchesSearch && matchesTags;
+    const matchesOwnership = !showOnlyMine || question.author_id === user?.id;
+    
+    return matchesSearch && matchesTags && matchesOwnership;
   });
   
   return (
@@ -141,6 +147,23 @@ const Browse = () => {
                 )}
                 
                 <div className="space-y-6">
+                  {user && (
+                    <div>
+                      <h3 className="text-lg font-semibold mb-3">My Questions</h3>
+                      <div className="flex items-center">
+                        <Button 
+                          variant={showOnlyMine ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setShowOnlyMine(!showOnlyMine)}
+                          className="flex items-center gap-2"
+                        >
+                          <User className="h-4 w-4" />
+                          {showOnlyMine ? "All Questions" : "Show Only Mine"}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
                   <div>
                     <h3 className="text-lg font-semibold mb-3">Sort By</h3>
                     <select 
@@ -263,15 +286,26 @@ const Browse = () => {
                 <p className="mt-2 text-gray-600 dark:text-gray-400">
                   Try adjusting your search or filters
                 </p>
-                {selectedTags.length > 0 && (
-                  <Button 
-                    variant="outline"
-                    className="mt-4"
-                    onClick={() => setSelectedTags([])}
-                  >
-                    Clear Tag Filters
-                  </Button>
-                )}
+                <div className="flex flex-wrap gap-2 justify-center mt-4">
+                  {selectedTags.length > 0 && (
+                    <Button 
+                      variant="outline"
+                      onClick={() => setSelectedTags([])}
+                    >
+                      Clear Tag Filters
+                    </Button>
+                  )}
+                  {showOnlyMine && (
+                    <Button 
+                      variant="outline"
+                      onClick={() => setShowOnlyMine(false)}
+                      className="flex items-center gap-2"
+                    >
+                      <User className="h-4 w-4" />
+                      Show All Questions
+                    </Button>
+                  )}
+                </div>
               </div>
             )}
           </main>

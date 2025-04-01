@@ -1,19 +1,24 @@
 
 import { motion } from 'framer-motion';
-import { ThumbsUp, MessageSquare, Clock } from 'lucide-react';
+import { ThumbsUp, MessageSquare, Clock, User } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import TagBadge from '@/components/ui/TagBadge';
 import { Question } from '@/lib/types';
 import { supabase } from '@/integrations/supabase/client';
 import { useEffect, useState } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import { Badge } from '@/components/ui/badge';
 
 interface QuestionCardProps {
   question: Question;
 }
 
 const QuestionCard = ({ question }: QuestionCardProps) => {
-  const { id, title, content, tags, votes } = question;
+  const { id, title, content, tags, votes, author_id } = question;
   const [commentCount, setCommentCount] = useState(0);
+  const { user } = useAuth();
+  
+  const isOwnQuestion = user?.id === author_id;
   
   useEffect(() => {
     // Fetch comment count for this question
@@ -46,12 +51,24 @@ const QuestionCard = ({ question }: QuestionCardProps) => {
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
       transition={{ duration: 0.3 }}
-      className="glass-card p-6 rounded-xl"
+      className={`glass-card p-6 rounded-xl ${isOwnQuestion ? 'border-2 border-blue-400 dark:border-blue-600' : ''}`}
     >
+      <div className="flex justify-between items-start">
+        <Link to={`/question/${id}`} className="block flex-1">
+          <h3 className="text-xl font-semibold text-gray-900 dark:text-white hover:text-gray-700 dark:hover:text-gray-200 transition-colors">
+            {title}
+          </h3>
+        </Link>
+        
+        {isOwnQuestion && (
+          <Badge variant="secondary" className="ml-2 flex items-center gap-1 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+            <User className="h-3 w-3" />
+            <span>Mine</span>
+          </Badge>
+        )}
+      </div>
+      
       <Link to={`/question/${id}`} className="block">
-        <h3 className="text-xl font-semibold text-gray-900 dark:text-white hover:text-gray-700 dark:hover:text-gray-200 transition-colors">
-          {title}
-        </h3>
         <p className="mt-2 text-gray-600 dark:text-gray-300 line-clamp-2">
           {content[0]}
         </p>
