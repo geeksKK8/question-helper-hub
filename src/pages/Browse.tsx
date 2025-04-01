@@ -30,53 +30,54 @@ const Browse = () => {
   const { user } = useAuth();
   
   // Fetch questions
-  useEffect(() => {
-    const fetchQuestions = async () => {
-      setLoading(true);
-      try {
-        let query = supabase.from('questions').select('*');
-        
-        if (sortBy === 'recent') {
-          query = query.order('created_at', { ascending: false });
-        } else if (sortBy === 'votes') {
-          query = query.order('votes', { ascending: false });
-        }
-        
-        const { data, error } = await query;
-        
-        if (error) {
-          console.error('Error fetching questions:', error);
-          toast.error('Failed to load questions');
-        } else {
-          setQuestions(data as Question[]);
-          
-          // Extract all tags for the filter
-          const allTags = data.flatMap(q => q.tags);
-          const uniqueTags = [...new Set(allTags)];
-          
-          // Create tag objects with counts
-          const tagsWithCounts = uniqueTags.map(tag => {
-            const count = data.filter(q => q.tags.includes(tag)).length;
-            return {
-              id: tag,
-              name: tag,
-              count
-            };
-          });
-          
-          // Sort by count
-          tagsWithCounts.sort((a, b) => b.count - a.count);
-          
-          setTags(tagsWithCounts);
-        }
-      } catch (err) {
-        console.error('Error in fetchQuestions:', err);
-        toast.error('An unexpected error occurred');
-      } finally {
-        setLoading(false);
+  const fetchQuestions = async () => {
+    setLoading(true);
+    try {
+      let query = supabase.from('questions').select('*');
+      
+      if (sortBy === 'recent') {
+        query = query.order('created_at', { ascending: false });
+      } else if (sortBy === 'votes') {
+        query = query.order('votes', { ascending: false });
       }
-    };
-    
+      
+      const { data, error } = await query;
+      
+      if (error) {
+        console.error('Error fetching questions:', error);
+        toast.error('Failed to load questions');
+      } else {
+        setQuestions(data as Question[]);
+        
+        // Extract all tags for the filter
+        const allTags = data.flatMap(q => q.tags);
+        const uniqueTags = [...new Set(allTags)];
+        
+        // Create tag objects with counts
+        const tagsWithCounts = uniqueTags.map(tag => {
+          const count = data.filter(q => q.tags.includes(tag)).length;
+          return {
+            id: tag,
+            name: tag,
+            count
+          };
+        });
+        
+        // Sort by count
+        tagsWithCounts.sort((a, b) => b.count - a.count);
+        
+        setTags(tagsWithCounts);
+      }
+    } catch (err) {
+      console.error('Error in fetchQuestions:', err);
+      toast.error('An unexpected error occurred');
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // Fetch questions on initial load and when sort option changes
+  useEffect(() => {
     fetchQuestions();
   }, [sortBy]);
   
@@ -90,6 +91,11 @@ const Browse = () => {
     } else {
       setSelectedTags([...selectedTags, tagName]);
     }
+  };
+  
+  const handleQuestionDeleted = () => {
+    // Refresh the questions list after a delete
+    fetchQuestions();
   };
   
   // Filter questions based on search term, selected tags, and ownership filter
@@ -273,7 +279,10 @@ const Browse = () => {
                       exit={{ opacity: 0, y: -20 }}
                       transition={{ duration: 0.3 }}
                     >
-                      <QuestionCard question={question} />
+                      <QuestionCard 
+                        question={question} 
+                        onDeleted={handleQuestionDeleted}
+                      />
                     </motion.div>
                   ))}
                 </AnimatePresence>
