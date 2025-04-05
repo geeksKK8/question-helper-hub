@@ -7,7 +7,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY')
+const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY')
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -19,41 +19,49 @@ serve(async (req) => {
     const { query, type } = await req.json()
 
     if (type === 'embedding') {
-      // Generate embedding for the query
-      const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${OPENAI_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          input: query,
-          model: "text-embedding-ada-002"
-        })
-      })
+      // Generate embedding using Google Gemini API
+      const embeddingResponse = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-exp-03-07:embedContent?key=${GEMINI_API_KEY}`, 
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: "models/gemini-embedding-exp-03-07",
+            content: {
+              parts: [{ text: query }]
+            }
+          })
+        }
+      )
 
       const embeddingData = await embeddingResponse.json()
-      const embedding = embeddingData.data[0].embedding
+      const embedding = embeddingData.embedding.values
 
       return new Response(JSON.stringify({ embedding }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     } else if (type === 'search') {
-      // Perform semantic search in Supabase
-      const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${OPENAI_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          input: query,
-          model: "text-embedding-ada-002"
-        })
-      })
+      // Generate query embedding
+      const embeddingResponse = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-exp-03-07:embedContent?key=${GEMINI_API_KEY}`, 
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: "models/gemini-embedding-exp-03-07",
+            content: {
+              parts: [{ text: query }]
+            }
+          })
+        }
+      )
 
       const embeddingData = await embeddingResponse.json()
-      const queryEmbedding = embeddingData.data[0].embedding
+      const queryEmbedding = embeddingData.embedding.values
 
       // Call Supabase function to find similar questions
       const supabaseResponse = await fetch(`https://ejoiyuobalmjfvgzsclq.supabase.co/rest/v1/rpc/match_questions`, {
