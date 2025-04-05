@@ -3,10 +3,11 @@ import { useState } from 'react';
 import { Search } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Input } from '@/components/ui/input';
+import { supabase } from '@/integrations/supabase/client';
 
 interface SearchBarProps {
   placeholder?: string;
-  onSearch?: (term: string) => void;
+  onSearch?: (results: any[]) => void;
   className?: string;
 }
 
@@ -17,11 +18,29 @@ const SearchBar = ({
 }: SearchBarProps) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isFocused, setIsFocused] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
 
-  const handleSearch = (e: React.FormEvent) => {
+  const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (onSearch && searchTerm.trim()) {
-      onSearch(searchTerm.trim());
+    if (!searchTerm.trim()) return;
+
+    setIsSearching(true);
+
+    try {
+      // Call semantic search edge function
+      const response = await supabase.functions.invoke('semantic-search', {
+        body: JSON.stringify({ query: searchTerm, type: 'search' })
+      });
+
+      const similarQuestions = response.data || [];
+
+      if (onSearch) {
+        onSearch(similarQuestions);
+      }
+    } catch (error) {
+      console.error('Semantic search error:', error);
+    } finally {
+      setIsSearching(false);
     }
   };
 
@@ -46,7 +65,8 @@ const SearchBar = ({
         />
         <button 
           type="submit"
-          className="absolute right-3 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+          disabled={isSearching}
+          className="absolute right-3 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors disabled:opacity-50"
         >
           <Search className="h-5 w-5" />
           <span className="sr-only">Search</span>
@@ -61,7 +81,7 @@ const SearchBar = ({
             className="absolute z-10 mt-2 w-full rounded-lg bg-white dark:bg-gray-800 shadow-lg overflow-hidden glass-card"
           >
             <div className="p-2 text-sm text-gray-500 dark:text-gray-400">
-              Type more to see suggestions...
+              {isSearching ? 'Searching...' : 'Type more to see suggestions...'}
             </div>
           </motion.div>
         )}
