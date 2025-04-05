@@ -1,9 +1,11 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import SearchBar from '@/components/ui/SearchBar';
 import QuestionCard from '@/components/questions/QuestionCard';
 import { Question } from '@/lib/types';
 import { useAuth } from '@/contexts/AuthContext';
+import EmbeddingGenerator from '@/components/ui/EmbeddingGenerator';
 
 const Browse = () => {
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -48,6 +50,9 @@ const Browse = () => {
     ? questions.filter(q => q.author_id === user.id)
     : questions;
 
+  // Check if user is an admin (for demo purposes, you'd have a proper admin check)
+  const isAdmin = user && user.email === 'admin@example.com';
+
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8 flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
@@ -71,6 +76,14 @@ const Browse = () => {
           </div>
         )}
       </div>
+
+      {/* Admin tools section */}
+      {isAdmin && (
+        <div className="mb-8">
+          <h2 className="text-xl font-semibold mb-4">Admin Tools</h2>
+          <EmbeddingGenerator />
+        </div>
+      )}
 
       {loading ? (
         <div className="text-center py-8">Loading questions...</div>
